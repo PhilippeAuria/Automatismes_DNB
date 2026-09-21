@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AutoDNB — Révision des automatismes</title>
+<title>AutoDNB : Révision des automatismes</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -170,7 +170,7 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
 <!-- ACCUEIL -->
 <div class="screen active" id="screen-home">
   <div class="home-title">Révise tes<br>automatismes</div>
-  <div class="home-sub">Épreuve de mathématiques — DNB · Cycle 4</div>
+  <div class="home-sub">Épreuve de mathématiques du DNB · Cycle 4</div>
   <div class="section-label">Choisis ton mode</div>
   <div class="mode-cards">
     <div class="mode-card selected" id="card-train" onclick="selectMode('training')">
@@ -190,7 +190,7 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
     <div class="theme-grid" id="theme-grid"></div>
   </div>
   <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
-    <button class="btn btn-primary" id="start-btn" onclick="startSession()">Commencer →</button>
+    <button class="btn btn-primary" id="start-btn" onclick="startSession()">Commencer</button>
   </div>
   <div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--border);font-size:.75rem;color:var(--muted);text-align:center;line-height:1.8;">
     Conçu par <strong style="color:var(--text)">Philippe Auria</strong> · Collège Fernand Donatien · Fort-de-France
@@ -207,7 +207,7 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
     <div class="timer-box" id="timer-box" style="display:none">⏱ <span id="timer-display">20:00</span></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
-  <div class="exam-banner" id="exam-banner" style="display:none">🔒 Mode <strong>Épreuve DNB</strong> — Aucune correction avant la fin du temps. Répondez à toutes les questions.</div>
+  <div class="exam-banner" id="exam-banner" style="display:none">🔒 Mode <strong>Épreuve DNB</strong> : aucune correction avant la fin du temps. Répondez à toutes les questions.</div>
   <div class="q-card" id="q-card">
     <div class="q-text" id="q-text"></div>
     <div id="q-figure-container"></div>
@@ -226,9 +226,9 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
   <div class="q-nav">
     <button class="btn-ghost" onclick="goHome()">← Accueil</button>
     <div style="display:flex;gap:10px;">
-      <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()" style="display:none">Suivant →</button>
-      <button class="btn btn-primary" id="btn-finish" onclick="finishSession()" style="display:none">Voir les résultats →</button>
-      <button class="btn btn-secondary" id="btn-skip" onclick="skipQuestion()">Passer →</button>
+      <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()" style="display:none">Suivant</button>
+      <button class="btn btn-primary" id="btn-finish" onclick="finishSession()" style="display:none">Voir les résultats</button>
+      <button class="btn btn-secondary" id="btn-skip" onclick="skipQuestion()">Passer</button>
     </div>
   </div>
 </div>
@@ -254,7 +254,7 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
   <div class="correction-title">Correction détaillée</div>
   <div id="correction-list"></div>
   <div class="results-actions">
-    <button class="btn btn-primary" onclick="restartSame()">Recommencer →</button>
+    <button class="btn btn-primary" onclick="restartSame()">Recommencer</button>
     <button class="btn btn-secondary" onclick="goHome()">Accueil</button>
   </div>
   <div style="margin-top:36px;padding-top:16px;border-top:1px solid var(--border);font-size:.72rem;color:var(--muted);text-align:center;">
@@ -2089,7 +2089,7 @@ function finishSession(){
   document.getElementById('score-num').textContent=isExam?String(scoreSur6).replace('.',','):correct;
   document.getElementById('score-denom').textContent=isExam?'/ 6':`/ ${total}`;
   document.getElementById('results-title').textContent=isExam?'Note finale':'Résultats';
-  document.getElementById('results-sub').textContent=isExam?`Épreuve DNB — ${correct} bonne${correct>1?'s':''} réponse${correct>1?'s':''} sur ${total}`:`${correct} bonne${correct>1?'s':''} réponse${correct>1?'s':''} sur ${total}`;
+  document.getElementById('results-sub').textContent=isExam?`Épreuve DNB : ${correct} bonne${correct>1?'s':''} réponse${correct>1?'s':''} sur ${total}`:`${correct} bonne${correct>1?'s':''} réponse${correct>1?'s':''} sur ${total}`;
   const badge=document.getElementById('mention-badge');
   const pct=isExam?(scoreSur6/6)*100:(correct/total)*100;
   if(pct>=80){badge.textContent='🏆 Excellent !';badge.style.cssText='display:inline-block;padding:5px 16px;border-radius:30px;font-family:Syne,sans-serif;font-weight:700;font-size:.82rem;margin-bottom:28px;background:rgba(61,214,140,.15);color:var(--green)';}
@@ -2107,7 +2107,7 @@ function finishSession(){
     const statusText=a.skipped?'Passée':a.correct?'Correct':'Incorrect';
     const statusClass=a.skipped?'sk':a.correct?'ok':'ko';
     const correctAnswer=q.type==='qcm'?q.choices[q.correct]:q.answer;
-    const userDisplay=a.skipped?'—':q.type==='qcm'&&a.userAnswer!==''?q.choices[parseInt(a.userAnswer)]||a.userAnswer:a.userAnswer||'—';
+    const userDisplay=a.skipped?'-':q.type==='qcm'&&a.userAnswer!==''?q.choices[parseInt(a.userAnswer)]||a.userAnswer:a.userAnswer||'-';
     div.innerHTML=`<div class="ci-top"><div class="ci-q">${q.text}</div><div class="ci-status ${statusClass}">${statusText}</div></div>
       <div class="ci-answer">Votre réponse : <strong>${userDisplay}</strong></div>
       ${!a.correct?`<div class="ci-answer">Bonne réponse : <strong>${correctAnswer}</strong></div>`:''}
