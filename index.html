@@ -319,36 +319,6 @@ function svgRepere(points, unite=40, ox=160, oy=160, w=380, h=300) {
   </svg>`;
 }
 
-// SVG triangle Pythagore
-function svgPythagore(sommets, cotes, angleD) {
-  const cText  = 'var(--svg-text)';
-  const cStroke= 'var(--svg-stroke)';
-  const cBlue  = 'var(--accent)';
-  const cGreen = 'var(--green)';
-  const cPoint = 'var(--svg-point)';
-  // sommets: [{x,y,label}], cotes: [{label,tx,ty,anchor}], angleD: {x,y} position du carré
-  const [A,B,C] = sommets;
-  let sq = '';
-  if(angleD) {
-    const s=12;
-    sq=`<polyline points="${angleD.x},${angleD.y-s} ${angleD.x+s},${angleD.y-s} ${angleD.x+s},${angleD.y}" fill="none" stroke="${cStroke}" stroke-width="1.5"/>`;
-  }
-  let cotelabels = cotes.map(c=>`<text x="${c.tx}" y="${c.ty}" text-anchor="${c.anchor||'middle'}" font-size="12" fill="${cBlue}" font-family="sans-serif" font-weight="500">${c.label}</text>`).join('');
-  return `<svg width="100%" viewBox="0 0 340 240" style="max-width:340px">
-    <line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="${cStroke}" stroke-width="2"/>
-    <line x1="${B.x}" y1="${B.y}" x2="${C.x}" y2="${C.y}" stroke="${cStroke}" stroke-width="2"/>
-    <line x1="${A.x}" y1="${A.y}" x2="${C.x}" y2="${C.y}" stroke="${cStroke}" stroke-width="2"/>
-    ${sq}
-    <circle cx="${A.x}" cy="${A.y}" r="3" fill="${cPoint}"/>
-    <circle cx="${B.x}" cy="${B.y}" r="3" fill="${cPoint}"/>
-    <circle cx="${C.x}" cy="${C.y}" r="3" fill="${cPoint}"/>
-    <text x="${A.lx}" y="${A.ly}" text-anchor="${A.la||'middle'}" font-size="13" fill="currentColor" font-weight="600" font-family="sans-serif">${A.label}</text>
-    <text x="${B.lx}" y="${B.ly}" text-anchor="${B.la||'middle'}" font-size="13" fill="currentColor" font-weight="600" font-family="sans-serif">${B.label}</text>
-    <text x="${C.lx}" y="${C.ly}" text-anchor="${C.la||'middle'}" font-size="13" fill="currentColor" font-weight="600" font-family="sans-serif">${C.label}</text>
-    ${cotelabels}
-  </svg>`;
-}
-
 // SVG Thalès emboîté
 function svgThalesEmboite(vals) {
   const {AD,DB,AE,EC,BC,lettres} = vals;
@@ -632,6 +602,390 @@ function svgCourbe(startH, endH, base, amp, threshold, peakH, cfg){
     <text x="${padL}" y="16" font-size="14" fill="var(--svg-text)" font-family="sans-serif">${axisLabel}</text>
   </svg>`;
 }
+
+// ═══════════════════════════════════════════════════════════
+// PYTHAGORE : figures et générateurs (théorème et réciproque)
+// ═══════════════════════════════════════════════════════════
+// Texte SVG centré verticalement sur y (le baseline est décalé en conséquence).
+function svgTexteCentre(x, y, anchor, size, fill, weight, s){
+  return `<text x="${x.toFixed(1)}" y="${(y+size*0.35).toFixed(1)}" text-anchor="${anchor}" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="sans-serif">${s}</text>`;
+}
+
+// Triangle rectangle orientable (rotation, symétries, inclinaison). Les étiquettes sont toujours
+// placées à l'extérieur du triangle, donc jamais sur un trait.
+// cfg : verts=[sommet de l'angle droit, autre sommet 1, autre sommet 2] ;
+//       sides=[côté 1, côté 2, hypoténuse] (chaîne vide : pas d'étiquette) ;
+//       rot (0/90/180/270), flip, vflip, tilt (degrés).
+function svgTriangleRect(cfg){
+  const cStroke='var(--svg-stroke)', cBlue='var(--accent)', cPoint='var(--svg-point)';
+  const W=170, H=120;
+  const ang=((cfg.rot||0)+(cfg.tilt||0))*Math.PI/180, cs=Math.cos(ang), sn=Math.sin(ang);
+  const sx=cfg.flip?-1:1, sy=cfg.vflip?-1:1;
+  const raw=[{x:0,y:0},{x:W,y:0},{x:0,y:-H}].map(p=>{
+    const x=p.x*sx, y=p.y*sy;
+    return {x:x*cs-y*sn, y:x*sn+y*cs};
+  });
+  const xs=raw.map(p=>p.x), ys=raw.map(p=>p.y);
+  const bw=Math.max(...xs)-Math.min(...xs), bh=Math.max(...ys)-Math.min(...ys);
+  const k=Math.min(220/bw, 165/bh, 1.25);
+  const ox=170-k*(Math.max(...xs)+Math.min(...xs))/2, oy=120-k*(Math.max(...ys)+Math.min(...ys))/2;
+  const [P,Q,R]=raw.map(p=>({x:ox+k*p.x, y:oy+k*p.y}));
+  const G={x:(P.x+Q.x+R.x)/3, y:(P.y+Q.y+R.y)/3};
+  const [Lr,L1,L2]=cfg.verts||[];
+  const sides=cfg.sides||[];
+  const vlabel=(V,s)=>{
+    if(!s) return '';
+    const d=Math.hypot(V.x-G.x,V.y-G.y)||1;
+    return svgTexteCentre(V.x+(V.x-G.x)/d*18, V.y+(V.y-G.y)/d*18, 'middle', 15, 'currentColor', 600, s);
+  };
+  const slabel=(A,B,s)=>{
+    if(!s) return '';
+    const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+    let nx=-(B.y-A.y), ny=B.x-A.x;
+    const l=Math.hypot(nx,ny); nx/=l; ny/=l;
+    if((mx-G.x)*nx+(my-G.y)*ny<0){ nx=-nx; ny=-ny; }
+    const w=String(s).length*7.6;
+    const d=10+Math.abs(nx)*w/2+Math.abs(ny)*8;
+    return svgTexteCentre(mx+nx*d, my+ny*d, 'middle', 14, cBlue, 500, s);
+  };
+  const unit=(A,B)=>{ const l=Math.hypot(B.x-A.x,B.y-A.y); return {x:(B.x-A.x)/l, y:(B.y-A.y)/l}; };
+  const u1=unit(P,Q), u2=unit(P,R), s=14;
+  const f=v=>v.toFixed(1);
+  const mark=`<polyline points="${f(P.x+s*u1.x)},${f(P.y+s*u1.y)} ${f(P.x+s*(u1.x+u2.x))},${f(P.y+s*(u1.y+u2.y))} ${f(P.x+s*u2.x)},${f(P.y+s*u2.y)}" fill="none" stroke="${cStroke}" stroke-width="1.5"/>`;
+  const seg=(A,B)=>`<line x1="${f(A.x)}" y1="${f(A.y)}" x2="${f(B.x)}" y2="${f(B.y)}" stroke="${cStroke}" stroke-width="2"/>`;
+  const dot=V=>`<circle cx="${f(V.x)}" cy="${f(V.y)}" r="3" fill="${cPoint}"/>`;
+  return `<svg width="100%" viewBox="0 0 340 240" style="max-width:340px">
+    ${seg(P,Q)}${seg(P,R)}${seg(Q,R)}
+    ${mark}
+    ${dot(P)}${dot(Q)}${dot(R)}
+    ${vlabel(P,Lr)}${vlabel(Q,L1)}${vlabel(R,L2)}
+    ${slabel(P,Q,sides[0])}${slabel(P,R,sides[1])}${slabel(Q,R,sides[2])}
+  </svg>`;
+}
+
+// Rectangle ABCD avec sa diagonale [AC]. A en bas à gauche, B en bas à droite, C en haut à droite,
+// D en haut à gauche. cfg : verts=[A,B,C,D], w (côté AB), h (côté BC), diag (diagonale AC).
+function svgRectangleDiag(cfg){
+  const cStroke='var(--svg-stroke)', cBlue='var(--accent)', cOrange='var(--orange)', cPoint='var(--svg-point)';
+  const x0=70, y0=52, x1=270, y1=172;
+  const [A,B,C,D]=cfg.verts;
+  const line=(xa,ya,xb,yb,col,w)=>`<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="${col}" stroke-width="${w}"/>`;
+  const dot=(x,y)=>`<circle cx="${x}" cy="${y}" r="3" fill="${cPoint}"/>`;
+  const dx=x1-x0, dy=y0-y1, len=Math.hypot(dx,dy);
+  const nx=dy/len, ny=-dx/len;                       // normale de la diagonale, côté haut-gauche
+  const wd=String(cfg.diag).length*7.6;
+  const dd=12+Math.abs(nx)*wd/2+Math.abs(ny)*9;
+  const mx=(x0+x1)/2, my=(y0+y1)/2;
+  return `<svg width="100%" viewBox="0 0 340 240" style="max-width:340px">
+    ${line(x0,y1,x1,y1,cStroke,2)}${line(x1,y1,x1,y0,cStroke,2)}${line(x1,y0,x0,y0,cStroke,2)}${line(x0,y0,x0,y1,cStroke,2)}
+    ${line(x0,y1,x1,y0,cOrange,2.5)}
+    <polyline points="${x1-10},${y1} ${x1-10},${y1-10} ${x1},${y1-10}" fill="none" stroke="${cStroke}" stroke-width="1.5"/>
+    <polyline points="${x0+10},${y0} ${x0+10},${y0+10} ${x0},${y0+10}" fill="none" stroke="${cStroke}" stroke-width="1.5"/>
+    ${dot(x0,y1)}${dot(x1,y1)}${dot(x1,y0)}${dot(x0,y0)}
+    ${svgTexteCentre(x0-14,y1+16,'end',15,'currentColor',600,A)}
+    ${svgTexteCentre(x1+14,y1+16,'start',15,'currentColor',600,B)}
+    ${svgTexteCentre(x1+14,y0-14,'start',15,'currentColor',600,C)}
+    ${svgTexteCentre(x0-14,y0-14,'end',15,'currentColor',600,D)}
+    ${cfg.w?svgTexteCentre(mx,y1+26,'middle',14,cBlue,500,cfg.w):''}
+    ${cfg.h?svgTexteCentre(x1+12,(y0+y1)/2,'start',14,cBlue,500,cfg.h):''}
+    ${cfg.diag?svgTexteCentre(mx+nx*dd,my+ny*dd,'middle',14,cOrange,600,cfg.diag):''}
+  </svg>`;
+}
+
+const PYTHA_TRIPLETS=[[3,4,5],[5,12,13],[8,15,17],[6,8,10],[9,12,15],[7,24,25],[10,24,26],[15,20,25],[12,16,20]];
+const PYTHA_RECT_SIMPLES=[[3,4,5],[6,8,10],[5,12,13],[9,12,15]];
+// Triangles presque rectangles (a <= b <= c, jamais rectangles)
+const PYTHA_NON_RECT=[[4,5,6],[5,6,7],[6,7,8],[5,5,8],[7,10,12],[6,9,11],[3,4,6],[5,12,14],[6,8,11],[6,8,9],[5,12,12],[9,12,14]];
+const PYTHA_LETTRES=[['A','B','C'],['M','N','P'],['R','S','T'],['E','F','G'],['K','L','U'],['X','Y','Z']];
+const PYTHA_RECTANGLES=[['A','B','C','D'],['E','F','G','H'],['M','N','P','Q'],['R','S','T','U']];
+
+// Orientation aléatoire d'une figure de triangle rectangle
+function pythaOrient(){
+  return {rot:pick([0,90,180,270]), flip:Math.random()<0.5, tilt:pick([0,0,-18,18])};
+}
+
+// Triple + sommets : droit = sommet de l'angle droit, p et q = les deux autres.
+// cA = [droit p] (longueur a), cB = [droit q] (longueur b), hyp = [p q] (longueur c).
+function pythaBase(){
+  const [a,b,c]=pick(PYTHA_TRIPLETS);
+  const trio=pick(PYTHA_LETTRES);
+  const droit=pick(trio);
+  const [p,q]=trio.filter(l=>l!==droit);
+  return {a,b,c,trio:trio.join(''),droit,p,q,hyp:`${p}${q}`,cA:`${p}${droit}`,cB:`${droit}${q}`};
+}
+
+// Détail du calcul de Pythagore. n={hyp,c1,c2} avec {nom,val}; cherche = 'hyp' | 'c1' | 'c2'.
+function pythaCalcul(n, cherche, unite){
+  const fmt=x=>/\s/.test(x.nom)?`(${x.nom})`:x.nom;   // noms de plusieurs mots entre parenthèses
+  const {hyp,c1,c2}=n;
+  if(cherche==='hyp'){
+    const s=c1.val*c1.val+c2.val*c2.val;
+    return `D'après le théorème de Pythagore : ${fmt(hyp)}² = ${fmt(c1)}² + ${fmt(c2)}² = ${c1.val}² + ${c2.val}² = ${c1.val*c1.val} + ${c2.val*c2.val} = ${s}. On calcule la racine carrée : ${fmt(hyp)} = √${s} = <strong>${hyp.val} ${unite}</strong>.`;
+  }
+  const [inc,con]=cherche==='c1'?[c1,c2]:[c2,c1];
+  const s=hyp.val*hyp.val-con.val*con.val;
+  return `D'après le théorème de Pythagore : ${fmt(hyp)}² = ${fmt(c1)}² + ${fmt(c2)}², donc ${fmt(inc)}² = ${fmt(hyp)}² − ${fmt(con)}² = ${hyp.val}² − ${con.val}² = ${hyp.val*hyp.val} − ${con.val*con.val} = ${s}. On calcule la racine carrée : ${fmt(inc)} = √${s} = <strong>${inc.val} ${unite}</strong>.`;
+}
+
+// Clé anti-doublon identique à celle du générateur de base (mêmes nombres = même question)
+const pythaCle=(...nums)=>nums.map(String).sort().join(',');
+
+// Conclusion de la réciproque (triangle rectangle) ou de la contraposée (triangle non rectangle).
+function pythaConclusion(a,b,c,rect,oui,non){
+  const comparaison=`On compare le carré du plus grand côté à la somme des carrés des deux autres : ${a}² + ${b}² = ${a*a} + ${b*b} = ${a*a+b*b}, et ${c}² = ${c*c}.`;
+  return rect
+    ? `${comparaison} Les deux valeurs sont égales, donc, d'après la réciproque du théorème de Pythagore, ${oui}.`
+    : `${comparaison} Comme ${a*a+b*b} ≠ ${c*c}, les deux valeurs ne sont pas égales, donc, d'après la contraposée du théorème de Pythagore, ${non}.`;
+}
+
+// Situations concrètes du théorème. Chaque fonction reçoit (a,b,c) avec a² + b² = c² et renvoie
+// le texte, la réponse, l'introduction de la correction, les noms des côtés et l'étiquetage de la figure.
+// a = côté horizontal, b = côté vertical, c = hypoténuse.
+const PYTHA_CONTEXTES=[
+  (a,b,c)=>{
+    const haut=Math.random()<0.5;
+    const text=haut
+      ? pick([`Une échelle de ${c} m est appuyée contre un mur. Sa base est à ${a} m du mur. À quelle hauteur atteint-elle le mur ?`,
+              `Une échelle de ${c} m est posée contre un mur, avec le pied à ${a} m du mur. Jusqu'à quelle hauteur monte-t-elle ?`])
+      : pick([`Une échelle de ${c} m est appuyée contre un mur. Elle atteint une hauteur de ${b} m. À quelle distance du mur se trouve sa base ?`,
+              `Une échelle de ${c} m est posée contre un mur et monte jusqu'à ${b} m de hauteur. À quelle distance du mur se trouve son pied ?`]);
+    return {text, answer:`${haut?b:a}`, unite:'m', cherche:haut?'c2':'c1',
+      intro:`L'échelle, le mur et le sol forment un triangle rectangle dont l'échelle est l'hypoténuse.`,
+      n:{hyp:{nom:'échelle',val:c},c1:{nom:'base',val:a},c2:{nom:'hauteur',val:b}},
+      sides:[haut?`${a} m`:'?', haut?'?':`${b} m`, `${c} m`], orient:{}};
+  },
+  (a,b,c)=>{
+    const cable=Math.random()<0.5;
+    const text=cable
+      ? `Une tyrolienne relie le haut d'un pylône de ${b} m de haut à un point du sol situé à ${a} m de son pied. Quelle est la longueur du câble ?`
+      : `Le câble d'une tyrolienne mesure ${c} m. Il relie le haut d'un pylône de ${b} m de haut à un point du sol. À quelle distance du pied du pylône ce point se trouve-t-il ?`;
+    return {text, answer:`${cable?c:a}`, unite:'m', cherche:cable?'hyp':'c1',
+      intro:`Le pylône, le sol et le câble forment un triangle rectangle dont le câble est l'hypoténuse.`,
+      n:{hyp:{nom:'câble',val:c},c1:{nom:'distance au pied',val:a},c2:{nom:'hauteur',val:b}},
+      sides:[cable?`${a} m`:'?', `${b} m`, cable?'?':`${c} m`], orient:{}};
+  },
+  (a,b,c)=>{
+    const hauban=Math.random()<0.5;
+    const text=hauban
+      ? `Un mât vertical de ${b} m est maintenu par un hauban fixé au sol à ${a} m de son pied. Quelle est la longueur du hauban ?`
+      : `Un hauban de ${c} m est fixé au sommet d'un mât et au sol, à ${a} m du pied du mât. Quelle est la hauteur du mât ?`;
+    return {text, answer:`${hauban?c:b}`, unite:'m', cherche:hauban?'hyp':'c2',
+      intro:`Le mât, le sol et le hauban forment un triangle rectangle dont le hauban est l'hypoténuse.`,
+      n:{hyp:{nom:'hauban',val:c},c1:{nom:'distance au pied',val:a},c2:{nom:'mât',val:b}},
+      sides:[`${a} m`, hauban?`${b} m`:'?', hauban?'?':`${c} m`], orient:{}};
+  },
+  (a,b,c)=>{
+    const longueur=Math.random()<0.5;
+    const text=longueur
+      ? `Un toboggan part du haut d'une plate-forme située à ${b} m du sol et arrive au sol à ${a} m de la plate-forme, à l'horizontale. Quelle est la longueur du toboggan ?`
+      : `Un toboggan de ${c} m de long part du haut d'une plate-forme située à ${b} m du sol. À quelle distance de la plate-forme, à l'horizontale, l'enfant arrive-t-il au sol ?`;
+    return {text, answer:`${longueur?c:a}`, unite:'m', cherche:longueur?'hyp':'c1',
+      intro:`La plate-forme, le sol et le toboggan forment un triangle rectangle dont le toboggan est l'hypoténuse.`,
+      n:{hyp:{nom:'toboggan',val:c},c1:{nom:'distance horizontale',val:a},c2:{nom:'hauteur',val:b}},
+      sides:[longueur?`${a} m`:'?', `${b} m`, longueur?'?':`${c} m`], orient:{flip:true}};
+  },
+  (a,b,c)=>{
+    const dirH=pick(["l'est","l'ouest"]), dirV=pick(['le nord','le sud']);
+    const qui=pick(['Un randonneur','Un cycliste','Un bateau','Un drone']);
+    const distance=Math.random()<0.5;
+    const text=distance
+      ? `${qui} parcourt ${a} km vers ${dirH}, puis ${b} km vers ${dirV}. À quelle distance de son point de départ se trouve-t-il ?`
+      : `${qui} parcourt ${a} km vers ${dirH}, puis avance vers ${dirV}. Il se trouve alors à ${c} km de son point de départ. Quelle distance a-t-il parcourue vers ${dirV} ?`;
+    return {text, answer:`${distance?c:b}`, unite:'km', cherche:distance?'hyp':'c2',
+      intro:`${dirH==="l'est"?"L'est":"L'ouest"} et ${dirV} sont deux directions perpendiculaires : le trajet et le retour direct au point de départ forment un triangle rectangle dont la distance au point de départ est l'hypoténuse.`,
+      n:{hyp:{nom:'distance au départ',val:c},c1:{nom:`trajet vers ${dirH}`,val:a},c2:{nom:`trajet vers ${dirV}`,val:b}},
+      sides:[`${a} km`, distance?`${b} km`:'?', distance?'?':`${c} km`],
+      orient:{flip:dirH==="l'est", vflip:dirV==='le sud'}};
+  },
+];
+
+const GEN_PYTHAGORE=[
+  // ── PYTHAGORE : THÉORÈME ───────────────────────────
+  // 1. Triangle rectangle, figure orientée au hasard
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const t=pythaBase();
+    const {a,b,c,trio,droit}=t;
+    const cherche=pick(['hyp','c1','c2']);
+    const noms={hyp:{nom:t.hyp,val:c},c1:{nom:t.cA,val:a},c2:{nom:t.cB,val:b}};
+    const cm=v=>`${v} cm`;
+    let text, answer, sides;
+    if(cherche==='hyp'){
+      text=pick([`Dans le triangle ${trio} rectangle en ${droit}, ${t.cA} = ${cm(a)} et ${t.cB} = ${cm(b)}. Calculez ${t.hyp}.`,
+                 `${trio} est un triangle rectangle en ${droit} tel que ${t.cB} = ${cm(b)} et ${t.cA} = ${cm(a)}. Quelle est la longueur ${t.hyp} ?`]);
+      answer=`${c}`; sides=[cm(a),cm(b),'?'];
+    } else if(cherche==='c1'){
+      text=pick([`Dans le triangle ${trio} rectangle en ${droit}, ${t.hyp} = ${cm(c)} et ${t.cB} = ${cm(b)}. Calculez ${t.cA}.`,
+                 `${trio} est un triangle rectangle en ${droit} tel que ${t.cB} = ${cm(b)} et ${t.hyp} = ${cm(c)}. Quelle est la longueur ${t.cA} ?`]);
+      answer=`${a}`; sides=['?',cm(b),cm(c)];
+    } else {
+      text=pick([`Dans le triangle ${trio} rectangle en ${droit}, ${t.hyp} = ${cm(c)} et ${t.cA} = ${cm(a)}. Calculez ${t.cB}.`,
+                 `${trio} est un triangle rectangle en ${droit} tel que ${t.cA} = ${cm(a)} et ${t.hyp} = ${cm(c)}. Quelle est la longueur ${t.cB} ?`]);
+      answer=`${b}`; sides=[cm(a),'?',cm(c)];
+    }
+    const explication=`Le triangle ${trio} est rectangle en ${droit} : son hypoténuse est le côté opposé à l'angle droit, c'est [${t.hyp}]. ${pythaCalcul(noms,cherche,'cm')}`;
+    return {type:'input', text, answer, explication,
+      figure:svgTriangleRect({verts:[droit,t.p,t.q], sides, ...pythaOrient()})};
+  }},
+
+  // 2. Situations concrètes (échelle, tyrolienne, mât, toboggan, déplacement)
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const [a,b,c]=pick(PYTHA_TRIPLETS);
+    const v=pick(PYTHA_CONTEXTES)(a,b,c);
+    return {type:'input', text:v.text, answer:v.answer,
+      explication:`${v.intro} ${pythaCalcul(v.n,v.cherche,v.unite)}`,
+      figure:svgTriangleRect({sides:v.sides, ...v.orient})};
+  }},
+
+  // 3. Diagonale d'un rectangle : figure = rectangle avec sa diagonale
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const [a,b,c]=pick(PYTHA_TRIPLETS);           // a = largeur, b = longueur, c = diagonale
+    const [A,B,C,D]=pick(PYTHA_RECTANGLES);
+    const objet=pick([{d:'Un',n:'terrain'},{d:'Un',n:'jardin'},{d:'Un',n:'parking'},{d:'Un',n:'champ'},
+      {d:'Une',n:'piscine'},{d:'Une',n:'cour'},{d:'Un',n:'écran de cinéma en plein air'},{d:'Un',n:'panneau publicitaire'}]);
+    const cherche=pick(['hyp','c1','c2']);
+    const noms={hyp:{nom:`${A}${C}`,val:c},c1:{nom:`${A}${B}`,val:b},c2:{nom:`${B}${C}`,val:a}};
+    let text, answer, w=`${b} m`, h=`${a} m`, diag=`${c} m`;
+    if(cherche==='hyp'){
+      text=Math.random()<0.5
+        ? `${objet.d} ${objet.n} rectangulaire mesure ${b} m sur ${a} m. Quelle est la longueur de sa diagonale ?`
+        : `${objet.d} ${objet.n} rectangulaire mesure ${a} m sur ${b} m. Quelle est la longueur de sa diagonale ?`;
+      answer=`${c}`; diag='?';
+    } else if(cherche==='c1'){
+      text=`${objet.d} ${objet.n} rectangulaire a une diagonale de ${c} m et une largeur de ${a} m. Quelle est sa longueur ?`;
+      answer=`${b}`; w='?';
+    } else {
+      text=`${objet.d} ${objet.n} rectangulaire a une diagonale de ${c} m et une longueur de ${b} m. Quelle est sa largeur ?`;
+      answer=`${a}`; h='?';
+    }
+    const explication=`La diagonale [${A}${C}] partage le rectangle ${A}${B}${C}${D} en deux triangles rectangles. Dans le triangle ${A}${B}${C} rectangle en ${B}, [${A}${C}] est l'hypoténuse. ${pythaCalcul(noms,cherche,'m')}`;
+    return {type:'input', text, answer, explication, figure:svgRectangleDiag({verts:[A,B,C,D], w, h, diag})};
+  }},
+
+  // 4. Quelle égalité écrire ? (QCM)
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const trio=pick(PYTHA_LETTRES), droit=pick(trio);
+    const [p,q]=trio.filter(l=>l!==droit);
+    const H=`${p}${q}`, X=Math.random()<0.5?`${p}${droit}`:`${droit}${p}`, Y=Math.random()<0.5?`${droit}${q}`:`${q}${droit}`;
+    const bonne=`${H}² = ${X}² + ${Y}²`;
+    const fausses=shuffle([`${X}² = ${H}² + ${Y}²`,`${Y}² = ${H}² + ${X}²`,`${H} = ${X} + ${Y}`,`${H}² = ${X}² − ${Y}²`]).slice(0,3);
+    const choices=shuffle([bonne,...fausses]);
+    return {type:'qcm', text:`Le triangle ${trio.join('')} est rectangle en ${droit}. Quelle égalité est vraie ?`,
+      choices, correct:choices.indexOf(bonne), dedupeKey:`egalite|${trio.join('')}|${droit}|${H}`,
+      explication:`L'angle droit est en ${droit}, donc l'hypoténuse est le côté opposé : [${H}]. Le théorème de Pythagore dit que le carré de l'hypoténuse est égal à la somme des carrés des deux autres côtés : <strong>${bonne}</strong>.`,
+      figure:svgTriangleRect({verts:[droit,p,q], sides:['','',''], ...pythaOrient()})};
+  }},
+
+  // 5. Calculer seulement un carré (on s'arrête avant la racine)
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const t=pythaBase();
+    const {a,b,c,trio,droit}=t;
+    const cherche=pick(['hyp','c1','c2']);
+    let text, answer, explication;
+    if(cherche==='hyp'){
+      text=`Le triangle ${trio} est rectangle en ${droit}, avec ${t.cA} = ${a} cm et ${t.cB} = ${b} cm. Calculez ${t.hyp}².`;
+      answer=`${a*a+b*b}`;
+      explication=`Le triangle est rectangle en ${droit}, donc [${t.hyp}] est l'hypoténuse. D'après le théorème de Pythagore : ${t.hyp}² = ${t.cA}² + ${t.cB}² = ${a}² + ${b}² = ${a*a} + ${b*b} = <strong>${a*a+b*b}</strong>. Ici, on s'arrête au carré : il n'y a pas de racine carrée à calculer.`;
+    } else {
+      const [inc,con,vi,vc]=cherche==='c1'?[t.cA,t.cB,a,b]:[t.cB,t.cA,b,a];
+      text=`Le triangle ${trio} est rectangle en ${droit}, avec ${t.hyp} = ${c} cm et ${con} = ${vc} cm. Calculez ${inc}².`;
+      answer=`${vi*vi}`;
+      explication=`Le triangle est rectangle en ${droit}, donc [${t.hyp}] est l'hypoténuse. D'après le théorème de Pythagore : ${t.hyp}² = ${t.cA}² + ${t.cB}², donc ${inc}² = ${t.hyp}² − ${con}² = ${c}² − ${vc}² = ${c*c} − ${vc*vc} = <strong>${vi*vi}</strong>. Ici, on s'arrête au carré : il n'y a pas de racine carrée à calculer.`;
+    }
+    return {type:'input', text, answer, explication,
+      dedupeKey:cherche==='hyp'?pythaCle(a,b):cherche==='c1'?pythaCle(c,b):pythaCle(c,a)};
+  }},
+
+  // 6. Reconnaître l'hypoténuse (QCM)
+  { theme:"Pythagore - Théorème", generate:()=>{
+    const trio=pick(PYTHA_LETTRES), droit=pick(trio);
+    const [p,q]=trio.filter(l=>l!==droit);
+    const bonne=`[${p}${q}]`;
+    const choices=shuffle([bonne,`[${p}${droit}]`,`[${droit}${q}]`]);
+    return {type:'qcm', text:`Le triangle ${trio.join('')} est rectangle en ${droit}. Quel côté est l'hypoténuse ?`,
+      choices, correct:choices.indexOf(bonne), dedupeKey:`hypotenuse|${trio.join('')}|${droit}`,
+      explication:`L'hypoténuse est le côté opposé à l'angle droit. L'angle droit est en ${droit}, donc l'hypoténuse est le seul côté qui ne touche pas ${droit} : <strong>${bonne}</strong>. C'est aussi le plus long côté du triangle.`,
+      figure:svgTriangleRect({verts:[droit,p,q], sides:['','',''], ...pythaOrient()})};
+  }},
+
+  // ── PYTHAGORE : RÉCIPROQUE ─────────────────────────
+  // 1. Justification à choisir (QCM), triangle rectangle ou presque
+  { theme:"Pythagore - Réciproque", generate:()=>{
+    const rect=Math.random()<0.5;
+    const [a,b,c]=rect?pick(PYTHA_TRIPLETS):pick(PYTHA_NON_RECT);
+    const [x,y,z]=shuffle([a,b,c]);
+    const text=pick([`Un triangle a des côtés mesurant ${x} cm, ${y} cm et ${z} cm. Est-il rectangle ?`,
+      `Peut-on affirmer qu'un triangle de côtés ${x}, ${y} et ${z} est rectangle ?`,
+      `On considère un triangle de côtés ${x} cm, ${y} cm et ${z} cm. Ce triangle est-il rectangle ?`]);
+    const bonne=rect?`Oui, car ${a}² + ${b}² = ${c}²`:`Non, car ${a}² + ${b}² ≠ ${c}²`;
+    const fausses=rect
+      ? [`Non, car ${a} + ${b} ≠ ${c}`,`Oui, car ${a} + ${b} > ${c}`,`Non, car ${a}² + ${c}² ≠ ${b}²`]
+      : [`Oui, car ${a}² + ${b}² = ${c}²`,`Oui, car ${a} + ${b} > ${c}`,`Non, car ${a} + ${b} ≠ ${c}`];
+    const choices=shuffle([bonne,...fausses]);
+    return {type:'qcm', text, choices, correct:choices.indexOf(bonne),
+      explication:pythaConclusion(a,b,c,rect,'ce triangle est <strong>rectangle</strong>',"ce triangle <strong>n'est pas rectangle</strong>")};
+  }},
+
+  // 2. Rectangle ou non, sans QCM (valeurs simples)
+  { theme:"Pythagore - Réciproque", generate:()=>{
+    const rect=Math.random()<0.4;
+    const [a,b,c]=rect?pick(PYTHA_RECT_SIMPLES):pick(PYTHA_NON_RECT);
+    const [x,y,z]=shuffle([a,b,c]);
+    const text=pick([`Un triangle a des côtés mesurant ${x} cm, ${y} cm et ${z} cm. Ce triangle est-il rectangle ?`,
+      `On considère un triangle de côtés ${x} cm, ${y} cm et ${z} cm. Ce triangle est-il rectangle ?`,
+      `Un triangle a pour côtés ${x} cm, ${y} cm et ${z} cm. Est-il rectangle ?`]);
+    return {type:'input', text, answer:rect?'Oui':'Non',
+      explication:pythaConclusion(a,b,c,rect,'ce triangle est <strong>rectangle</strong>',"ce triangle <strong>n'est pas rectangle</strong>")};
+  }},
+
+  // 3. En quel sommet le triangle est-il rectangle ?
+  { theme:"Pythagore - Réciproque", generate:()=>{
+    const t=pythaBase();
+    const {a,b,c,trio,droit}=t;
+    const cotes=shuffle([[t.cA,a],[t.cB,b],[t.hyp,c]]).map(([n,v])=>`${n} = ${v} cm`);
+    return {type:'input',
+      text:`Le triangle ${trio} est rectangle, avec ${cotes[0]}, ${cotes[1]} et ${cotes[2]}. En quel sommet est-il rectangle ?`,
+      answer:droit,
+      explication:`Dans un triangle rectangle, l'angle droit est opposé à l'hypoténuse, qui est le plus grand côté. Ici le plus grand côté est [${t.hyp}] (${c} cm) : l'angle droit est donc au sommet qui n'est pas sur ce côté, c'est <strong>${droit}</strong>. Vérification : ${a}² + ${b}² = ${a*a} + ${b*b} = ${c*c} = ${c}².`};
+  }},
+
+  // 4. Quelle égalité faut-il vérifier ? (QCM)
+  { theme:"Pythagore - Réciproque", generate:()=>{
+    const rect=Math.random()<0.5;
+    const [a,b,c]=rect?pick(PYTHA_TRIPLETS):pick(PYTHA_NON_RECT);
+    const trio=pick(PYTHA_LETTRES);
+    const noms=shuffle([`${trio[0]}${trio[1]}`,`${trio[1]}${trio[2]}`,`${trio[0]}${trio[2]}`]);
+    const [na,nb_,nc]=noms;                              // na = a, nb_ = b, nc = c (le plus long)
+    const cotes=shuffle([[na,a],[nb_,b],[nc,c]]).map(([n,v])=>`${n} = ${v} cm`);
+    const bonne=`${nc}² = ${na}² + ${nb_}²`;
+    const fausses=[`${na}² = ${nb_}² + ${nc}²`,`${nb_}² = ${na}² + ${nc}²`,`${nc} = ${na} + ${nb_}`];
+    const choices=shuffle([bonne,...fausses]);
+    const suite=rect?`Ici, ${a}² + ${b}² = ${a*a} + ${b*b} = ${c*c} = ${c}² : le triangle est <strong>rectangle</strong>, d'après la réciproque du théorème de Pythagore.`
+      :`Ici, ${a}² + ${b}² = ${a*a+b*b} et ${c}² = ${c*c} : ces deux valeurs sont différentes, donc, d'après la contraposée du théorème de Pythagore, le triangle <strong>n'est pas rectangle</strong>.`;
+    return {type:'qcm',
+      text:`Le triangle ${trio.join('')} a pour côtés ${cotes[0]}, ${cotes[1]} et ${cotes[2]}. Pour savoir s'il est rectangle, quelle égalité faut-il vérifier ?`,
+      choices, correct:choices.indexOf(bonne),
+      explication:`Le plus grand côté est [${nc}] (${c} cm) : c'est lui qui serait l'hypoténuse. On vérifie donc si le carré du plus grand côté est égal à la somme des carrés des deux autres : <strong>${bonne}</strong>. ${suite}`};
+  }},
+
+  // 5. Situations concrètes (équerrage d'un mur, angle droit au jardin)
+  { theme:"Pythagore - Réciproque", generate:()=>{
+    const cm=[[[30,40,50],[60,80,100]],[[30,40,45],[60,80,105],[60,80,95],[30,40,55]]];
+    const m=[PYTHA_RECT_SIMPLES.slice(0,3),PYTHA_NON_RECT.slice(0,6)];
+    const scene=pick([
+      {vals:cm, texte:(x,y,z)=>`Un maçon vérifie qu'un coin de mur est bien à angle droit. Il marque un point à ${x} cm du coin sur un mur, un point à ${y} cm du coin sur l'autre mur, puis mesure ${z} cm entre ces deux points. Le coin est-il à angle droit ?`,
+        oui:'le coin est bien à angle droit', non:"le coin n'est pas à angle droit"},
+      {vals:cm, texte:(x,y,z)=>`Un menuisier assemble deux planches de ${x} cm et ${y} cm. Il mesure ${z} cm entre leurs extrémités libres. Les deux planches forment-elles un angle droit ?`,
+        oui:'les deux planches forment bien un angle droit', non:'les deux planches ne forment pas un angle droit'},
+      {vals:m, texte:(x,y,z)=>`Pour tracer un angle droit dans un potager, un jardinier tend une corde : il mesure ${x} m sur un côté, ${y} m sur l'autre côté et ${z} m entre les deux extrémités. L'angle est-il droit ?`,
+        oui:"l'angle est bien droit", non:"l'angle n'est pas droit"},
+    ]);
+    const rect=Math.random()<0.5;
+    const [a,b,c]=pick(scene.vals[rect?0:1]);
+    const [x,y]=shuffle([a,b]);
+    return {type:'input', text:scene.texte(x,y,c), answer:rect?'Oui':'Non',
+      explication:pythaConclusion(a,b,c,rect,`<strong>${scene.oui}</strong>`,`<strong>${scene.non}</strong>`)};
+  }},
+];
 
 // ═══════════════════════════════════════════════════════════
 // BANQUE DE QUESTIONS (générateurs)
@@ -983,106 +1337,7 @@ const GENERATORS = [
       figure: svgMotifTranslation(positions,dx,dy,half)};
   }},
 
-  // ── PYTHAGORE ──────────────────────────────────────
-  { theme:"Pythagore - Théorème", generate:()=>{
-    const triplets=[[3,4,5],[5,12,13],[8,15,17],[6,8,10],[9,12,15],[7,24,25],[10,24,26],[15,20,25],[12,16,20]];
-    const [a,b,c]=pick(triplets);
-    const lets=pick([['A','B','C'],['M','N','P'],['R','S','T']]);
-    const [L1,L2,L3]=lets;
-    const angleD=pick([L1,L2,L3]);
-    const autres=lets.filter(l=>l!==angleD);
-    const unknown=pick(['hyp','cote']);
-    let text,answer,explication;
-    if(unknown==='hyp'){
-      text=`Dans le triangle ${L1}${L2}${L3} rectangle en ${angleD}, ${autres[0]}${angleD} = ${a} cm et ${angleD}${autres[1]} = ${b} cm. Calculez ${autres[0]}${autres[1]}.`;
-      answer=`${c}`;
-      explication=`D'après le théorème de Pythagore, dans un triangle rectangle le carré de l'hypoténuse est égal à la somme des carrés des deux autres côtés. Ici l'hypoténuse est [${autres[0]}${autres[1]}] (le côté opposé à l'angle droit) : ${autres[0]}${autres[1]}² = ${autres[0]}${angleD}² + ${angleD}${autres[1]}² = ${a}² + ${b}² = ${a*a} + ${b*b} = ${a*a+b*b}. On calcule ensuite la racine carrée : ${autres[0]}${autres[1]} = √${a*a+b*b} = <strong>${c} cm</strong>.`;
-    } else {
-      text=`Dans le triangle ${L1}${L2}${L3} rectangle en ${angleD}, l'hypoténuse ${autres[0]}${autres[1]} = ${c} cm et ${autres[0]}${angleD} = ${a} cm. Calculez ${angleD}${autres[1]}.`;
-      answer=`${b}`;
-      explication=`D'après le théorème de Pythagore, ${autres[0]}${autres[1]}² = ${autres[0]}${angleD}² + ${angleD}${autres[1]}², l'hypoténuse [${autres[0]}${autres[1]}] étant le côté opposé à l'angle droit. On isole donc le côté cherché : ${angleD}${autres[1]}² = ${autres[0]}${autres[1]}² − ${autres[0]}${angleD}² = ${c}² − ${a}² = ${c*c} − ${a*a} = ${b*b}. On calcule ensuite la racine carrée : ${angleD}${autres[1]} = √${b*b} = <strong>${b} cm</strong>.`;
-    }
-    const useContext = Math.random()<0.3;
-    let finalText, finalAnswer, ctxType;
-    if(useContext){
-      const ctxChoice = Math.random()<0.5 ? 'terrain' : 'echelle';
-      if(ctxChoice==='terrain'){
-        const noun=pick(['terrain','jardin','parking','champ']);
-        const swap=Math.random()<0.5;
-        const [p,q]=swap?[b,a]:[a,b];
-        finalText=`Un ${noun} rectangulaire mesure ${p} m sur ${q} m. Quelle est la longueur de sa diagonale ?`;
-        finalAnswer=`${c}`; ctxType='terrain';
-      } else {
-        const askHeight=Math.random()<0.5;
-        const phrasing=pick([0,1]);
-        if(askHeight){
-          finalText=phrasing===0
-            ? `Une échelle de ${c} m est appuyée contre un mur. Sa base est à ${a} m du mur. À quelle hauteur atteint-elle le mur ?`
-            : `Une échelle de ${c} m est posée contre un mur, avec le pied à ${a} m du mur. Jusqu'à quelle hauteur monte-t-elle ?`;
-          finalAnswer=`${b}`;
-        } else {
-          finalText=phrasing===0
-            ? `Une échelle de ${c} m est appuyée contre un mur. Elle atteint une hauteur de ${b} m. À quelle distance du mur se trouve sa base ?`
-            : `Une échelle de ${c} m est posée contre un mur et monte jusqu'à ${b} m de hauteur. À quelle distance du mur se trouve son pied ?`;
-          finalAnswer=`${a}`;
-        }
-        ctxType=askHeight?'echelle_h':'echelle_b';
-      }
-    } else { finalText = text; finalAnswer = answer; ctxType = 'abstract'; }
-    let labelVert, labelHoriz, labelHyp;
-    if(ctxType==='echelle_h'){ labelVert='?'; labelHoriz=`${a} m`; labelHyp=`${c} m`; }
-    else if(ctxType==='echelle_b'){ labelVert=`${b} m`; labelHoriz='?'; labelHyp=`${c} m`; }
-    else if(ctxType==='terrain'){ labelVert=`${a} m`; labelHoriz=`${b} m`; labelHyp='?'; }
-    else { labelVert=`${a} cm`; labelHoriz = unknown==='cote' ? '?' : `${b} cm`; labelHyp = unknown==='hyp' ? '?' : `${c} cm`; }
-    let finalExpl;
-    if(ctxType==='echelle_h') finalExpl=`L'échelle, le mur et le sol forment un triangle rectangle dont l'échelle est l'hypoténuse. D'après le théorème de Pythagore : hauteur² = échelle² − base² = ${c}² − ${a}² = ${c*c} − ${a*a} = ${b*b}. On calcule la racine carrée : hauteur = √${b*b} = <strong>${b} m</strong>.`;
-    else if(ctxType==='echelle_b') finalExpl=`L'échelle, le mur et le sol forment un triangle rectangle dont l'échelle est l'hypoténuse. D'après le théorème de Pythagore : base² = échelle² − hauteur² = ${c}² − ${b}² = ${c*c} − ${b*b} = ${a*a}. On calcule la racine carrée : base = √${a*a} = <strong>${a} m</strong>.`;
-    else if(ctxType==='terrain') finalExpl=`La diagonale d'un terrain rectangulaire est l'hypoténuse du triangle rectangle formé par deux côtés du terrain. D'après le théorème de Pythagore : diagonale² = ${a}² + ${b}² = ${a*a} + ${b*b} = ${a*a+b*b}. On calcule la racine carrée : diagonale = √${a*a+b*b} = <strong>${c} m</strong>.`;
-    else finalExpl = explication;
-    return {
-      type:'input', text:finalText, answer:finalAnswer, explication:finalExpl,
-      figure: svgPythagore(
-        [{x:60,y:60, label:autres[0], lx:44, ly:56,  la:'end'},
-         {x:60,y:200,label:angleD,    lx:44, ly:216, la:'end'},
-         {x:240,y:200,label:autres[1],lx:256,ly:216, la:'start'}],
-        [{label:labelVert,  tx:40, ty:135, anchor:'end'},
-         {label:labelHoriz, tx:150,ty:218, anchor:'middle'},
-         {label:labelHyp,   tx:172,ty:118, anchor:'middle'}],
-        {x:60,y:200}
-      )
-    };
-  }},
-
-  { theme:"Pythagore - Réciproque", generate:()=>{
-    const triplets=[[3,4,5],[5,12,13],[8,15,17],[6,8,10],[9,12,15],[7,24,25],[10,24,26],[15,20,25],[12,16,20]];
-    const [a,b,c]=pick(triplets);
-    const variants=[
-      {text:`Un triangle a des côtés mesurant ${a} cm, ${b} cm et ${c} cm. Est-il rectangle ?`},
-      {text:`Peut-on affirmer qu'un triangle de côtés ${a}, ${b} et ${c} est rectangle ?`},
-    ];
-    const choices=[`Oui, car ${a}² + ${b}² = ${c}²`,`Non, car ${a} + ${b} ≠ ${c}`,`Oui, car ${a} + ${b} > ${c}`,`Non, car ${a}² + ${c}² ≠ ${b}²`];
-    return {type:'qcm', text:pick(variants).text, choices, correct:0, explication:`La réciproque du théorème de Pythagore permet de vérifier si un triangle est rectangle : si le carré du plus grand côté est égal à la somme des carrés des deux autres, alors le triangle est rectangle. Ici : ${a}² + ${b}² = ${a*a} + ${b*b} = ${c*c}, et ${c}² = ${c*c} également. L'égalité étant vérifiée, le triangle est bien <strong>rectangle</strong> (l'angle droit est opposé au côté ${c}, le plus long).`};
-  }},
-
-  { theme:"Pythagore - Réciproque", generate:()=>{
-    const cas=[
-      {a:3,b:4,c:5,rect:true},{a:6,b:8,c:10,rect:true},{a:5,b:12,c:13,rect:true},{a:9,b:12,c:15,rect:true},
-      {a:4,b:5,c:6,rect:false},{a:5,b:6,c:7,rect:false},{a:6,b:7,c:8,rect:false},{a:5,b:5,c:8,rect:false},
-      {a:7,b:10,c:12,rect:false},{a:6,b:9,c:11,rect:false},
-    ];
-    const v=pick(cas);
-    const {a,b,c,rect}=v;
-    const sommeCarres=a*a+b*b;
-    const carreC=c*c;
-    const variants=[
-      `Un triangle a des côtés mesurant ${a} cm, ${b} cm et ${c} cm. Ce triangle est-il rectangle ?`,
-      `On considère un triangle de côtés ${a} cm, ${b} cm et ${c} cm. Ce triangle est-il rectangle ?`,
-    ];
-    const explication = rect
-      ? `On compare le carré du plus grand côté à la somme des carrés des deux autres : ${a}² + ${b}² = ${a*a} + ${b*b} = ${sommeCarres}, et ${c}² = ${carreC}. Les deux valeurs sont égales, donc, d'après la réciproque du théorème de Pythagore, ce triangle est <strong>rectangle</strong>.`
-      : `On compare le carré du plus grand côté à la somme des carrés des deux autres : ${a}² + ${b}² = ${a*a} + ${b*b} = ${sommeCarres}, et ${c}² = ${carreC}. Comme ${sommeCarres} ≠ ${carreC}, les deux valeurs ne sont pas égales, donc, d'après la contraposée du théorème de Pythagore, ce triangle <strong>n'est pas rectangle</strong>.`;
-    return {type:'input', text:pick(variants), answer: rect?'Oui':'Non', explication};
-  }},
+  ...GEN_PYTHAGORE,
 
   // ── THALÈS ─────────────────────────────────────────
   { theme:"Thalès - Théorème", generate:()=>{
@@ -1192,18 +1447,20 @@ const GENERATORS = [
     const angleD=pick([L1,L2,L3]);
     const autres=lets.filter(l=>l!==angleD);
     const text=`Dans le triangle ${L1}${L2}${L3} rectangle en ${angleD}, cos(${ang(autres[1],autres[0],angleD)}) est égal à :`;
-    const choices=[frac(autres[0]+autres[1],autres[0]+angleD), frac(autres[0]+angleD,autres[0]+autres[1]), frac(angleD+autres[1],autres[0]+autres[1]), frac(autres[0]+angleD,angleD+autres[1])];
+    const choicesBase=[frac(autres[0]+autres[1],autres[0]+angleD), frac(autres[0]+angleD,autres[0]+autres[1]), frac(angleD+autres[1],autres[0]+autres[1]), frac(autres[0]+angleD,angleD+autres[1])];
+    const choices=shuffle(choicesBase);
     const explication=`Dans un triangle rectangle, le cosinus d'un angle aigu est égal au rapport entre le côté adjacent à cet angle et l'hypoténuse : cos = côté adjacent ÷ hypoténuse. Ici, le côté adjacent à ${ang(autres[1],autres[0],angleD)} est [${autres[0]}${angleD}] et l'hypoténuse est [${autres[0]}${autres[1]}] (le côté opposé à l'angle droit), donc cos(${ang(autres[1],autres[0],angleD)}) = <strong>${frac(autres[0]+angleD, autres[0]+autres[1])}</strong>.`;
-    return {type:'qcm', text, choices, correct:1, explication};
+    return {type:'qcm', text, choices, correct:choices.indexOf(choicesBase[1]), explication};
   }},
 
   { theme:"Trigonométrie", generate:()=>{
     const cases=[{angle:30},{angle:45},{angle:60}];
     const v=pick(cases);
     const hyp=rnd(4,10)*2;
-    const choices=['côté opposé = hypoténuse × sin(angle)','côté opposé = hypoténuse × cos(angle)','côté opposé = hypoténuse + sin(angle)','côté opposé = hypoténuse ÷ cos(angle)'];
+    const bonne='côté opposé = hypoténuse × sin(angle)';
+    const choices=shuffle([bonne,'côté opposé = hypoténuse × cos(angle)','côté opposé = hypoténuse + sin(angle)','côté opposé = hypoténuse ÷ cos(angle)']);
     return {type:'qcm', text:`Dans un triangle rectangle, un angle mesure ${v.angle}°. L'hypoténuse mesure ${hyp} cm. Pour calculer le côté opposé à cet angle, quelle formule utilise-t-on ?`,
-      choices, correct:0, explication:`Dans un triangle rectangle, le sinus d'un angle aigu est égal au rapport entre le côté opposé à cet angle et l'hypoténuse : sin(angle) = côté opposé ÷ hypoténuse. En multipliant les deux membres par l'hypoténuse, on obtient <strong>côté opposé = hypoténuse × sin(angle)</strong>.`};
+      choices, correct:choices.indexOf(bonne), explication:`Dans un triangle rectangle, le sinus d'un angle aigu est égal au rapport entre le côté opposé à cet angle et l'hypoténuse : sin(angle) = côté opposé ÷ hypoténuse. En multipliant les deux membres par l'hypoténuse, on obtient <strong>côté opposé = hypoténuse × sin(angle)</strong>.`};
   }},
 
   // ── AIRES & VOLUMES ────────────────────────────────
