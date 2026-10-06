@@ -153,12 +153,54 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
 .ci-expl{font-size:.8rem;color:var(--muted);font-style:italic;font-weight:300;line-height:1.5;margin-top:5px;padding-top:5px;border-top:1px solid var(--border);}
 .results-actions{display:flex;gap:12px;justify-content:center;margin-top:28px;flex-wrap:wrap;}
 @media(max-width:560px){.mode-cards{grid-template-columns:1fr;}.q-card{padding:20px 16px;}.stats-row{grid-template-columns:1fr 1fr;}.container{padding:20px 14px;}header{padding:0 16px;}}
+
+/* PLEIN ÉCRAN / PROJECTION */
+@media(max-width:560px){#fs-btn{display:none !important;}}
+body.presenting .container{max-width:1200px;}
+body.presenting .home-title{font-size:2.8rem;}
+body.presenting .home-sub{font-size:1.2rem;}
+body.presenting .section-label{font-size:.9rem;}
+body.presenting .mode-card{padding:30px 26px;}
+body.presenting .mode-title{font-size:1.3rem;}
+body.presenting .mode-desc{font-size:1.05rem;}
+body.presenting .theme-chip{font-size:1.05rem;padding:9px 20px;}
+body.presenting .btn{font-size:1.15rem;padding:15px 34px;}
+body.presenting .btn-ghost{font-size:1.15rem;}
+body.presenting .q-counter{font-size:1.15rem;}
+body.presenting .q-theme-badge{font-size:.95rem;padding:5px 14px;}
+body.presenting .timer-box{font-size:2.4rem;padding:8px 28px;min-width:200px;border-radius:14px;}
+body.presenting .exam-banner{font-size:1.2rem;padding:16px 24px;}
+body.presenting .q-card{padding:48px 56px;}
+body.presenting .q-text{font-size:1.9rem;}
+body.presenting .q-hint{font-size:1.1rem;}
+body.presenting .choice-btn{font-size:1.45rem;padding:18px 24px;}
+body.presenting .choice-letter{width:38px;height:38px;font-size:1.05rem;}
+body.presenting .q-input{font-size:1.4rem;width:300px;padding:16px 20px;}
+body.presenting .btn-validate{font-size:1.2rem;padding:16px 30px;}
+body.presenting .feedback-text{font-size:1.4rem;}
+body.presenting .feedback-expl{font-size:1.25rem;}
+body.presenting .q-figure svg{max-width:min(600px,100%) !important;max-height:420px;}
+body.presenting .q-figure table{font-size:1.5rem;}
+body.presenting .results-title{font-size:2.1rem;}
+body.presenting .results-sub{font-size:1.2rem;}
+body.presenting .mention-badge{font-size:1.1rem;}
+body.presenting .stat-val{font-size:2rem;}
+body.presenting .stat-lbl{font-size:1rem;}
+body.presenting .correction-title{font-size:.95rem;}
+body.presenting .correction-item{padding:22px 26px;}
+body.presenting .ci-q{font-size:1.35rem;}
+body.presenting .ci-status{font-size:1rem;padding:5px 13px;}
+body.presenting .ci-answer{font-size:1.2rem;}
+body.presenting .ci-expl{font-size:1.15rem;}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Auto<span>DNB</span></div>
   <div style="display:flex;align-items:center;gap:16px;">
+    <button id="fs-btn" onclick="toggleFullscreen()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
+      <span id="fs-icon">⛶</span><span id="fs-label">Plein écran</span>
+    </button>
     <button id="theme-toggle" onclick="toggleTheme()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
       <span id="theme-icon">☀️</span><span id="theme-label">Fond clair</span>
     </button>
@@ -2120,6 +2162,24 @@ function finishSession(){
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});}
 function goHome(){clearInterval(timerInterval);showScreen('screen-home');}
 function restartSame(){startSession();}
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+    document.getElementById('fs-label').textContent='Quitter le plein écran';
+    document.body.classList.add('presenting');
+  } else {
+    document.exitFullscreen().catch(()=>{});
+    document.getElementById('fs-label').textContent='Plein écran';
+    document.body.classList.remove('presenting');
+  }
+}
+document.addEventListener('fullscreenchange',()=>{
+  if(!document.fullscreenElement){
+    document.getElementById('fs-label').textContent='Plein écran';
+    document.body.classList.remove('presenting');
+  }
+});
 
 initThemeGrid();
 
