@@ -107,6 +107,9 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
 /* SVG figures dans les questions */
 .q-figure{margin:16px 0;display:flex;justify-content:center;}
 .q-figure svg{max-width:100%;}
+.q-figure table{border-collapse:collapse;font-size:1.1rem;}
+.q-figure table td,.q-figure table th{border:1px solid var(--border);padding:8px 16px;text-align:center;}
+.q-figure table th{background:var(--surface2);font-family:'Syne',sans-serif;}
 
 /* Notation angle */
 .ang-wrap{display:inline-flex;align-items:flex-end;gap:0;line-height:1;}
@@ -362,6 +365,227 @@ function svgRepere(points, unite=40, ox=160, oy=160, w=380, h=300) {
 }
 
 // SVG Thalès emboîté
+// ═══════════════════════════════════════════════════════════
+// FONCTIONS : outils communs (expressions, courbes, graphique, tableau)
+// ═══════════════════════════════════════════════════════════
+const FX_NOMS=['f','g','h'];
+const fxPc=n=>n<0?`(${nb(n)})`:`${n}`;
+const fxSigne=n=>n<0?'−':'+';
+const fxAcc=n=>[...new Set([String(n),nb(n)])];
+function fxAff(a,b){
+  const t=a===1?'x':a===-1?'−x':`${nb(a)}x`;
+  return b>0?`${t} + ${b}`:b<0?`${t} − ${-b}`:t;
+}
+// entier non nul, négatif avec la probabilité pNeg
+function fxX(pNeg,max,min=2){ const v=rnd(min,max); return Math.random()<pNeg?-v:v; }
+
+// Expressions de fonctions : expr (texte), val (calcul), det (substitution détaillée),
+// base (nombre élevé au carré, s'il y en a un), wrongs (erreurs classiques d'élèves)
+function fxMake(kind){
+  const K=[-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9];
+  switch(kind){
+    case 'lin': {
+      const a=pick([2,3,4,5,6,7,-2,-3,-4]);
+      return {kind,a,b:0,expr:`${nb(a)}x`,val:x=>a*x,
+        det:x=>`${fxPc(a)} × ${fxPc(x)} = ${nb(a*x)}`,
+        wrongs:x=>[a+x,-a*x,a*x+a]};
+    }
+    case 'aff': {
+      const a=pick([2,3,4,5,-2,-3,-4]), b=pick(K);
+      return {kind,a,b,expr:fxAff(a,b),val:x=>a*x+b,
+        det:x=>`${fxPc(a)} × ${fxPc(x)} ${fxSigne(b)} ${Math.abs(b)} = ${nb(a*x)} ${fxSigne(b)} ${Math.abs(b)} = ${nb(a*x+b)}`,
+        wrongs:x=>[a*x-b,a+x+b,a*(x+b)]};
+    }
+    case 'sq': {
+      const k=pick(K);
+      return {kind,k,expr:`x² ${fxSigne(k)} ${Math.abs(k)}`,val:x=>x*x+k,base:x=>x,
+        det:x=>`${fxPc(x)}² ${fxSigne(k)} ${Math.abs(k)} = ${nb(x*x)} ${fxSigne(k)} ${Math.abs(k)} = ${nb(x*x+k)}`,
+        wrongs:x=>[-x*x+k,2*x+k,x*x-k]};
+    }
+    case 'sqc': {
+      const a=pick([2,3,4,-2,-3]);
+      return {kind,a,expr:`${nb(a)}x²`,val:x=>a*x*x,base:x=>x,
+        det:x=>`${fxPc(a)} × ${fxPc(x)}² = ${fxPc(a)} × ${nb(x*x)} = ${nb(a*x*x)}`,
+        wrongs:x=>[a*x*a*x,-a*x*x,2*a*x]};
+    }
+    case 'neg': {
+      const k=rnd(1,10);
+      return {kind,k,expr:`−x² + ${k}`,val:x=>-x*x+k,base:x=>x,
+        det:x=>`−${fxPc(x)}² + ${k} = ${nb(-x*x)} + ${k} = ${nb(-x*x+k)}`,
+        wrongs:x=>[x*x+k,-2*x+k,-x*x-k]};
+    }
+    case 'ql': {
+      const p=pick([2,3,4,5]), s=pick([1,-1]);
+      const op=s>0?'+':'−';
+      return {kind,p,s,expr:`x² ${op} ${p}x`,val:x=>x*x+s*p*x,base:x=>x,
+        det:x=>{ const t=s*p*x; return `${fxPc(x)}² ${op} ${p} × ${fxPc(x)} = ${nb(x*x)} ${fxSigne(t)} ${Math.abs(t)} = ${nb(x*x+t)}`; },
+        wrongs:x=>[-x*x+s*p*x,x*x-s*p*x,x*x-p]};
+    }
+    case 'sh': {
+      const h=pick([-3,-2,-1,1,2,3]);
+      return {kind,h,expr:`(x ${h>0?'−':'+'} ${Math.abs(h)})²`,val:x=>(x-h)*(x-h),base:x=>x-h,
+        det:x=>`(${nb(x)} ${h>0?'−':'+'} ${Math.abs(h)})² = ${fxPc(x-h)}² = ${nb((x-h)*(x-h))}`,
+        wrongs:x=>[x*x-h*h,x*x+h*h,(x+h)*(x+h)]};
+    }
+  }
+}
+
+// QCM numérique : bonne réponse + 3 erreurs plausibles (complétées si besoin), mélangées
+function fxQcmNum(correct,wrongs){
+  const set=[];
+  const add=v=>{ if(Number.isFinite(v)&&v!==correct&&!set.includes(v)) set.push(v); };
+  wrongs.forEach(add);
+  let pad=1; while(set.length<3){ add(correct+pad); add(correct-pad); pad++; }
+  const choices=shuffle([correct,...set.slice(0,3)]).map(nb);
+  return {choices,correct:choices.indexOf(nb(correct))};
+}
+
+// Interpolation lisse qui conserve la monotonie : passe exactement par les nœuds (pas régulier)
+function fxPchip(xs,ys){
+  const n=xs.length, d=[], m=new Array(n).fill(0);
+  for(let i=0;i<n-1;i++) d[i]=(ys[i+1]-ys[i])/(xs[i+1]-xs[i]);
+  for(let i=1;i<n-1;i++) m[i]=(d[i-1]*d[i]<=0)?0:2*d[i-1]*d[i]/(d[i-1]+d[i]);
+  m[0]=d[0]; m[n-1]=d[n-2];
+  return x=>{
+    if(x<=xs[0]) return ys[0];
+    if(x>=xs[n-1]) return ys[n-1];
+    let k=0; while(x>xs[k+1]) k++;
+    const h=xs[k+1]-xs[k], t=(x-xs[k])/h;
+    return (2*t**3-3*t**2+1)*ys[k]+(t**3-2*t**2+t)*h*m[k]+(-2*t**3+3*t**2)*ys[k+1]+(t**3-t**2)*h*m[k+1];
+  };
+}
+
+// Courbes à valeurs entières aux points de lecture : droite, parabole, courbe libre, courbe monotone
+function fxCourbe(type){
+  if(type==='line'){
+    const a=pick([-3,-2,-1,1,2,3]), b=rnd(-4,4);
+    return {type,isLine:true,a,b,f:x=>a*x+b,d0:-5,d1:5,key:`L${a}_${b}`};
+  }
+  if(type==='par'){
+    const s=pick([1,-1]), h=rnd(-2,2), v=rnd(-3,3);
+    return {type,isLine:false,s,h,v,f:x=>s*(x-h)*(x-h)+v,d0:-5,d1:5,key:`P${s}_${h}_${v}`};
+  }
+  if(type==='free'){
+    const xs=[-4,-3,-2,-1,0,1,2,3,4];
+    for(let t=0;t<300;t++){
+      const ys=[rnd(-3,3)];
+      for(let i=1;i<9;i++) ys.push(ys[i-1]+pick([-2,-1,-1,0,1,1,2]));
+      const sp=Math.max(...ys)-Math.min(...ys);
+      if(sp>=3&&sp<=6) return {type,isLine:false,xs,ys,f:fxPchip(xs,ys),d0:-4,d1:4,key:'F'+ys.join('_')};
+    }
+    return null;
+  }
+  if(type==='mono'){
+    const xs=[-4,-2,0,2,4], s=pick([1,-1]);
+    for(let t=0;t<300;t++){
+      const inc=[0,0,0,0].map(()=>pick([1,2,3]));
+      const tot=inc.reduce((p,c)=>p+c,0);
+      if(tot<4||tot>6) continue;
+      let ys=[rnd(-5,0)]; inc.forEach(d=>ys.push(ys[ys.length-1]+d));
+      if(s<0) ys=ys.map(y=>-y);
+      if(ys.some(y=>Math.abs(y)>5)) continue;
+      return {type,isLine:false,xs,ys,f:fxPchip(xs,ys),d0:-4,d1:4,key:'M'+ys.join('_')};
+    }
+    return null;
+  }
+  return null;
+}
+
+// Fenêtre verticale de 7 unités qui contient 0 et toutes les ordonnées données (marge d'une demi-unité)
+function fxWindow(ys){
+  const ok=[];
+  for(let lo=-6;lo<=-1;lo++){ const hi=lo+7; if(ys.every(y=>y>=lo+0.5&&y<=hi-0.5)) ok.push([lo,hi]); }
+  return ok.length?pick(ok):null;
+}
+
+// Point entier de la courbe, pour lire une image
+function fxPointImage(C){
+  if(C.type==='line'){ const x=rnd(-3,3), y=C.f(x); return Math.abs(y)<=5?{x,y}:null; }
+  if(C.type==='par'){
+    const xs=[]; for(let x=C.h-2;x<=C.h+2;x++) if(x>=-4&&x<=4) xs.push(x);
+    const x=pick(xs), y=C.f(x); return Math.abs(y)<=5?{x,y}:null;
+  }
+  if(C.type==='free'){ const x=rnd(-3,3); return {x,y:C.ys[x+4]}; }
+  if(C.type==='mono'){ const i=rnd(0,4); return {x:C.xs[i],y:C.ys[i]}; }
+  return null;
+}
+// Point entier de la courbe, pour lire un antécédent (courbes où l'antécédent est unique)
+function fxPointAntecedent(C){
+  if(C.type==='line'){ const x=rnd(-3,3), y=C.f(x); return Math.abs(y)<=5?{x,y}:null; }
+  if(C.type==='mono'){ const i=rnd(1,3); return {x:C.xs[i],y:C.ys[i]}; }
+  return null;
+}
+function fxScene(types,pointer){
+  for(let t=0;t<400;t++){
+    const C=fxCourbe(pick(types)); if(!C) continue;
+    const P=pointer(C); if(!P) continue;
+    const ys=(C.ys||[]).concat([P.y]); if(C.type==='par') ys.push(C.v);
+    const w=fxWindow(ys);
+    if(w) return {C,P,ymin:w[0],ymax:w[1]};
+  }
+  return null;
+}
+
+// Représentation graphique : repère gradué, droite ou courbe, point facultatif
+function svgFonction(cfg){
+  const {name,ymin,ymax,curve,point}=cfg;
+  const xmin=-5,xmax=5,u=36,L=18,R=34,T=30,B=14;
+  const W=L+(xmax-xmin)*u+R, H=T+(ymax-ymin)*u+B;
+  const X=x=>L+(x-xmin)*u, Y=y=>T+(ymax-y)*u;
+  const cs='var(--svg-stroke)', cb='var(--border)', cc='var(--accent2)', cp='var(--red)';
+  const id='fx'+Math.floor(Math.random()*1e9);
+  const ff='font-family="sans-serif"';
+  let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img"><title>Représentation graphique de la fonction ${name}</title>`;
+  s+=`<defs><clipPath id="${id}c"><rect x="${X(xmin)}" y="${Y(ymax)}" width="${(xmax-xmin)*u}" height="${(ymax-ymin)*u}"/></clipPath><marker id="${id}a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="${cs}"/></marker></defs>`;
+  for(let x=xmin;x<=xmax;x++) s+=`<line x1="${X(x)}" y1="${Y(ymax)}" x2="${X(x)}" y2="${Y(ymin)}" stroke="${cb}" stroke-width="1"/>`;
+  for(let y=ymin;y<=ymax;y++) s+=`<line x1="${X(xmin)}" y1="${Y(y)}" x2="${X(xmax)}" y2="${Y(y)}" stroke="${cb}" stroke-width="1"/>`;
+  s+=`<line x1="${X(xmin)-8}" y1="${Y(0)}" x2="${X(xmax)+16}" y2="${Y(0)}" stroke="${cs}" stroke-width="1.8" marker-end="url(#${id}a)"/>`;
+  s+=`<line x1="${X(0)}" y1="${Y(ymin)+8}" x2="${X(0)}" y2="${Y(ymax)-16}" stroke="${cs}" stroke-width="1.8" marker-end="url(#${id}a)"/>`;
+  for(let x=xmin;x<=xmax;x++){ if(x===0) continue;
+    s+=`<line x1="${X(x)}" y1="${Y(0)-5}" x2="${X(x)}" y2="${Y(0)+5}" stroke="${cs}" stroke-width="1.6"/>`;
+    s+=`<text x="${X(x)}" y="${Y(0)+22}" text-anchor="middle" font-size="17" fill="${cs}" ${ff}>${nb(x)}</text>`;
+  }
+  for(let y=ymin;y<=ymax;y++){ if(y===0) continue;
+    s+=`<line x1="${X(0)-5}" y1="${Y(y)}" x2="${X(0)+5}" y2="${Y(y)}" stroke="${cs}" stroke-width="1.6"/>`;
+    s+=`<text x="${X(0)-10}" y="${Y(y)+6}" text-anchor="end" font-size="17" fill="${cs}" ${ff}>${nb(y)}</text>`;
+  }
+  s+=`<text x="${X(0)-7}" y="${Y(0)+22}" text-anchor="end" font-size="16" fill="${cs}" ${ff}>O</text>`;
+  s+=`<text x="${X(xmax)+14}" y="${Y(0)+24}" font-size="18" fill="${cs}" ${ff}>x</text>`;
+  s+=`<text x="${X(0)+10}" y="${Y(ymax)-18}" font-size="18" fill="${cs}" ${ff}>y</text>`;
+  const N=curve.isLine?1:Math.round((curve.d1-curve.d0)/0.05);
+  const pts=[];
+  for(let i=0;i<=N;i++){ const x=curve.d0+(curve.d1-curve.d0)*i/N; pts.push(`${X(x).toFixed(1)},${Y(curve.f(x)).toFixed(1)}`); }
+  s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${cc}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#${id}c)"/>`;
+  let lab=null;
+  const yEnd=curve.f(curve.d1);
+  if(curve.d1<xmax-0.5&&yEnd>ymin+0.7&&yEnd<ymax-0.7){
+    lab={x:X(curve.d1)+10,y:Y(yEnd)+7};
+  } else {
+    for(let x=curve.d1-0.4;x>=curve.d0;x-=0.1){
+      const y=curve.f(x);
+      if(x<xmax-0.4&&y>ymin+0.7&&y<ymax-0.7){
+        const m=(curve.f(x+0.1)-curve.f(x-0.1))/0.2;
+        lab={x:X(x)+8,y:Y(y)+(m>0?22:-9)};
+        break;
+      }
+    }
+  }
+  if(lab) s+=`<text x="${lab.x}" y="${lab.y}" font-size="23" font-style="italic" font-weight="700" fill="${cc}" font-family="serif">${name}</text>`;
+  if(point){
+    s+=`<circle cx="${X(point.x)}" cy="${Y(point.y)}" r="6" fill="${cp}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    const pm=(curve.f(point.x+0.1)-curve.f(point.x-0.1))/0.2;
+    s+=`<text x="${X(point.x)+(pm>0.15?-22:9)}" y="${Y(point.y)-9}" font-size="21" font-weight="700" fill="${cp}" ${ff}>${point.label}</text>`;
+  }
+  return s+'</svg>';
+}
+
+// Tableau de valeurs (une case peut être masquée par « ? »)
+function fxTable(n,xs,ys,manquant=-1){
+  const r1=xs.map(x=>`<td>${nb(x)}</td>`).join('');
+  const r2=ys.map((y,i)=>`<td>${i===manquant?'?':nb(y)}</td>`).join('');
+  return `<table><tr><th>x</th>${r1}</tr><tr><th>${n}(x)</th>${r2}</tr></table>`;
+}
+
 function svgThalesEmboite(vals) {
   const {AD,DB,AE,EC,BC,lettres} = vals;
   const [lA,lB,lC,lD,lE] = lettres;
@@ -1718,7 +1942,7 @@ const GENERATORS = [
   }},
 
   // ── PROPORTIONNALITÉ & FONCTIONS ──────────────────
-  { theme:"Proportionnalité & fonctions", generate:()=>{
+  { theme:"Proportionnalité & pourcentages", generate:()=>{
     const items=[{nom:'article',prix:rnd(4,12)*10},{nom:'vêtement',prix:rnd(3,8)*10},{nom:'livre',prix:rnd(1,4)*10}];
     const it=pick(items); const taux=pick([10,20,25,30,50]); const rem=it.prix*taux/100; const final=it.prix-rem;
     const hausse=pick([5,10,15,20]); const augm=it.prix*hausse/100; const finalH=it.prix+augm;
@@ -1734,7 +1958,7 @@ const GENERATORS = [
     }
   }},
 
-  { theme:"Proportionnalité & fonctions", generate:()=>{
+  { theme:"Proportionnalité & pourcentages", generate:()=>{
     const tables=[{ctx:'stylos',u:1.5,n1:3,n2:5},{ctx:'cahiers',u:2,n1:4,n2:6},{ctx:'livres',u:3.5,n1:2,n2:5}];
     const t=pick(tables); const c1=t.u*t.n1; const c2=t.u*t.n2;
     const variants=[
@@ -1744,7 +1968,7 @@ const GENERATORS = [
     return {...pick(variants), type:'input'};
   }},
 
-  { theme:"Proportionnalité & fonctions", generate:()=>{
+  { theme:"Fonctions", generate:()=>{
     const foncts=[
       {f:'f : x ↦ 3x',prop:true,explication:'f(x) = 3x est de la forme ax, donc <strong>proportionnalité</strong>.'},
       {f:'g : x ↦ 2x + 1',prop:false,explication:'g(x) = 2x + 1 a un terme constant (+1), donc <strong>pas une proportionnalité</strong>.'},
@@ -1758,7 +1982,7 @@ const GENERATORS = [
     return {type:'qcm', text:pick(variants), choices, correct, explication:v.explication};
   }},
 
-  { theme:"Proportionnalité & fonctions", generate:()=>{
+  { theme:"Proportionnalité & pourcentages", generate:()=>{
     const speeds=[20,30,40,50,60,80];
     const v=pick(speeds); const t=pick([0.5,1,1.5,2,2.5]);
     const d=v*t;
@@ -1772,11 +1996,308 @@ const GENERATORS = [
     }
   }},
 
-  { theme:"Proportionnalité & fonctions", generate:()=>{
+  { theme:"Proportionnalité & pourcentages", generate:()=>{
     const u=pick([2,3,4,5,6]); const a1=pick([4,6,8]); const a2=pick([10,12,15,18]);
     const b1=u*a1; const b2=u*a2;
     return {type:'input', text:`On considère le tableau de proportionnalité suivant :`, figure:`<table><tr><td>${a1}</td><td>${a2}</td></tr><tr><td>${b1}</td><td>a</td></tr></table><div style="margin-top:8px;font-size:.95rem;color:var(--muted);">Combien vaut a ?</div>`,
       answer:`${b2}`, explication:`Dans un tableau de proportionnalité, on passe de la première ligne à la seconde en multipliant toujours par le même nombre, appelé coefficient de proportionnalité. Ici, ce coefficient est ${b1} ÷ ${a1} = ${u}. On l'applique à la colonne manquante : a = ${a2} × ${u} = <strong>${b2}</strong>.`};
+  }},
+
+
+  // ── FONCTIONS (image, antécédent, notations, graphiques) ──────────
+  // Vocabulaire et notations
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const a=pick([-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9]);
+    let b; do{ b=pick([-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10,12]); }while(b===a);
+    const A=nb(a), B=nb(b);
+    const phrase=pick([
+      `L'image de ${A} par la fonction ${n} est ${B}.`,
+      `Le nombre ${A} a pour image ${B} par la fonction ${n}.`,
+      `${B} est l'image de ${A} par la fonction ${n}.`,
+      `${A} est un antécédent de ${B} par la fonction ${n}.`,
+    ]);
+    const ok=`${n}(${A}) = ${B}`;
+    const choices=shuffle([ok,`${n}(${B}) = ${A}`,`${fxPc(a)} × ${n} = ${B}`,`${n} = ${fxPc(a)} + ${fxPc(b)}`]);
+    return {type:'qcm', text:`${phrase} Quelle égalité traduit cette information ?`, choices, correct:choices.indexOf(ok),
+      explication:`Dire que ${B} est l'image de ${A} par ${n} signifie que, lorsqu'on remplace x par ${A} dans ${n}(x), on obtient ${B}. On l'écrit <strong>${ok}</strong> : le nombre de départ ${A} se place entre les parenthèses, et son image ${B} après le signe égal. Le nombre ${A} est aussi un antécédent de ${B}.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const a=pick([-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8]);
+    let b; do{ b=pick([-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10]); }while(b===a);
+    const A=nb(a), B=nb(b);
+    const viaImage=Math.random()<0.5;
+    const bonne=viaImage?`${B} est l'image de ${A} par ${n}`:`${A} est un antécédent de ${B} par ${n}`;
+    const fausses=viaImage
+      ?[`${A} est l'image de ${B} par ${n}`,`${B} est un antécédent de ${A} par ${n}`,`${A} et ${B} ont la même image par ${n}`]
+      :[`${B} est un antécédent de ${A} par ${n}`,`${A} est l'image de ${B} par ${n}`,`${A} et ${B} ont la même image par ${n}`];
+    const choices=shuffle([bonne,...fausses]);
+    return {type:'qcm', text:`On sait que ${n}(${A}) = ${B}. Laquelle de ces affirmations est correcte ?`, choices, correct:choices.indexOf(bonne),
+      explication:`L'égalité ${n}(${A}) = ${B} se lit : « l'image de ${A} par ${n} est ${B} ». Le nombre placé entre les parenthèses (${A}) est le nombre de départ, c'est un antécédent. Le nombre placé après le signe égal (${B}) est son image. Donc <strong>${bonne}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const [a1,b1,a2,b2]=shuffle([-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10,12]).slice(0,4);
+    const i=rnd(0,1), ai=i?a2:a1, bi=i?b2:b1;
+    const A=nb(ai), B=nb(bi);
+    const kind=rnd(0,3);
+    const q=[
+      `Quelle est l'image de ${A} par ${n} ?`,
+      `Quel est l'antécédent de ${B} par ${n} ?`,
+      `Quel nombre a pour image ${B} par ${n} ?`,
+      `${B} est l'image de quel nombre par ${n} ?`,
+    ][kind];
+    const ans=kind===0?bi:ai;
+    const expl=kind===0
+      ?`L'égalité ${n}(${A}) = ${B} indique que l'image de ${A} par ${n} est <strong>${B}</strong>.`
+      :`L'égalité ${n}(${A}) = ${B} indique que ${B} est l'image de ${A}. Le nombre cherché est donc <strong>${A}</strong>.`;
+    return {type:'input', text:`On sait que ${n}(${nb(a1)}) = ${nb(b1)} et que ${n}(${nb(a2)}) = ${nb(b2)}. ${q}`, answer:nb(ans), acceptedAnswers:fxAcc(ans),
+      explication:expl};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), a=pick([2,3,4,5]);
+    let b; do{ b=rnd(1,9); }while(b===a);
+    const mot={2:'double',3:'triple',4:'quadruple',5:'quintuple'}[a];
+    const m=pick([
+      {txt:`son ${mot} augmenté de ${b}`, ok:`${a}x + ${b}`, bad:[`${b===1?'':b}x + ${a}`,`${a}(x + ${b})`,`${a}x − ${b}`],
+       ex:`Le ${mot} de x s'écrit ${a}x. On lui ajoute ${b}, ce qui donne ${a}x + ${b}.`},
+      {txt:`son ${mot} diminué de ${b}`, ok:`${a}x − ${b}`, bad:[`${b} − ${a}x`,`${a}(x − ${b})`,`${a}x + ${b}`],
+       ex:`Le ${mot} de x s'écrit ${a}x. On lui retire ${b}, ce qui donne ${a}x − ${b}.`},
+      {txt:`son carré augmenté de ${b}`, ok:`x² + ${b}`, bad:[`(x + ${b})²`,`2x + ${b}`,`x + ${b}²`],
+       ex:`Le carré de x s'écrit x². On lui ajoute ${b}, ce qui donne x² + ${b}.`},
+      {txt:`son carré diminué de ${b}`, ok:`x² − ${b}`, bad:[`(x − ${b})²`,`2x − ${b}`,`x − ${b}²`],
+       ex:`Le carré de x s'écrit x². On lui retire ${b}, ce qui donne x² − ${b}.`},
+      {txt:`le double de son carré`, ok:`2x²`, bad:[`(2x)²`,`2x`,`x² + 2`],
+       ex:`Le carré de x s'écrit x², puis on prend le double : 2x². Attention, (2x)² représente le carré du double de x, ce n'est pas la même chose.`},
+      {txt:`l'opposé de son ${mot}`, ok:`−${a}x`, bad:[`${a}x`,`−x + ${a}`,`−${a} + x`],
+       ex:`Le ${mot} de x s'écrit ${a}x, et son opposé s'écrit −${a}x.`},
+    ]);
+    const choices=shuffle([m.ok,...m.bad]).map(e=>`${n}(x) = ${e}`);
+    return {type:'qcm', text:`Quelle expression définit la fonction ${n} qui, à un nombre x, associe ${m.txt} ?`, choices, correct:choices.indexOf(`${n}(x) = ${m.ok}`),
+      explication:`${m.ex} La fonction est donc définie par <strong>${n}(x) = ${m.ok}</strong>.`};
+  }},
+
+  // Calcul d'image
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake('lin'), x=fxX(0.35,9), y=F.val(x);
+    const text=pick([
+      `On considère la fonction linéaire ${n} définie par ${n}(x) = ${F.expr}. Calculez ${n}(${nb(x)}).`,
+      `La fonction linéaire ${n} a pour coefficient ${nb(F.a)}. Quelle est l'image de ${nb(x)} par ${n} ?`,
+      `Soit ${n} la fonction définie par ${n} : x ↦ ${F.expr}. Quelle est l'image de ${nb(x)} par ${n} ?`,
+    ]);
+    return {type:'input', text, answer:nb(y), acceptedAnswers:fxAcc(y), dedupeKey:`lin|${F.a}|${x}`,
+      explication:`Une fonction linéaire s'écrit ${n}(x) = ax. Ici ${n}(x) = ${F.expr}. On remplace x par ${nb(x)} : ${n}(${nb(x)}) = ${F.det(x)}. L'image de ${nb(x)} par ${n} est donc <strong>${nb(y)}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake('aff'), x=fxX(0.4,8), y=F.val(x);
+    const text=pick([
+      `On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Calculez ${n}(${nb(x)}).`,
+      `Soit ${n} la fonction définie par ${n} : x ↦ ${F.expr}. Quelle est l'image de ${nb(x)} par ${n} ?`,
+      `La fonction ${n} est définie par ${n}(x) = ${F.expr}. Déterminez l'image du nombre ${nb(x)}.`,
+    ]);
+    const par=x<0?` Quand le nombre est négatif, on le met entre parenthèses pour ne pas se tromper de signe.`:'';
+    return {type:'input', text, answer:nb(y), acceptedAnswers:fxAcc(y), dedupeKey:`aff|${F.a}|${F.b}|${x}`,
+      explication:`On remplace x par ${nb(x)} dans l'expression de ${n} : ${n}(${nb(x)}) = ${F.det(x)}.${par} L'image de ${nb(x)} par ${n} est <strong>${nb(y)}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const c=pick([
+      {phr:(a,b)=>`Une salle de sport demande ${b} € d'inscription, puis ${a} € par séance.`, u:'séances', per:'séance', a:[3,4,5,6,8], b:[10,15,20,25,30], x:[4,5,6,8,10,12]},
+      {phr:(a,b)=>`Un loueur de vélos facture un forfait de ${b} € auquel s'ajoutent ${a} € par heure.`, u:'heures', per:'heure', a:[2,3,4,5], b:[5,8,10,12], x:[2,3,4,5,6,8]},
+      {phr:(a,b)=>`Un taxi facture une prise en charge de ${b} € puis ${a} € par kilomètre parcouru.`, u:'kilomètres', per:'kilomètre', a:[1,2,3], b:[3,4,5,6], x:[5,8,10,12,15]},
+      {phr:(a,b)=>`Une imprimerie facture ${b} € de frais de livraison et ${a} € par affiche commandée.`, u:'affiches', per:'affiche', a:[2,3,4,5], b:[6,8,10,12], x:[3,5,6,8,10]},
+      {phr:(a,b)=>`Pour s'abonner à la piscine, on paie ${b} € de frais de dossier, puis ${a} € à chaque entrée.`, u:'entrées', per:'entrée', a:[2,3,4], b:[10,15,20], x:[5,6,8,10,12]},
+    ]);
+    const a=pick(c.a), b=pick(c.b), x=pick(c.x), y=a*x+b;
+    return {type:'input', text:`${c.phr(a,b)} On note ${n}(x) le prix à payer, en euros, pour x ${c.u}. Calculez ${n}(${x}).`, answer:`${y}`, acceptedAnswers:[`${y}`,`${y}€`,`${y} €`],
+      explication:`Le prix se calcule avec ${n}(x) = ${fxAff(a,b)} (${a} € par ${c.per} et ${b} € de frais fixes). Pour x = ${x} : ${n}(${x}) = ${a} × ${x} + ${b} = ${a*x} + ${b} = <strong>${y}</strong>. Il faut donc payer ${y} €.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const F=fxMake(pick(['sq','sq','sqc','neg','ql','sh']));
+    let x; do{ x=fxX(0.55,6); }while(F.kind==='sh'&&x===F.h);
+    const y=F.val(x), bs=F.base(x);
+    const par=x<0?' (entre parenthèses, pour ne pas se tromper de signe)':'';
+    const note=bs<0?` Attention : le carré d'un nombre négatif est positif, ${fxPc(bs)}² = ${nb(bs*bs)}.`:'';
+    const expl=`On remplace x par ${nb(x)}${par} : ${n}(${nb(x)}) = ${F.det(x)}.${note} L'image de ${nb(x)} par ${n} est <strong>${nb(y)}</strong>.`;
+    if(x<0&&Math.random()<0.55){
+      const q=fxQcmNum(y,F.wrongs(x));
+      return {type:'qcm', text:`On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Quelle est l'image de ${nb(x)} par ${n} ?`, choices:q.choices, correct:q.correct, explication:expl};
+    }
+    const text=pick([
+      `On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Calculez ${n}(${nb(x)}).`,
+      `Soit ${n} la fonction définie par ${n}(x) = ${F.expr}. Quelle est l'image de ${nb(x)} par ${n} ?`,
+    ]);
+    return {type:'input', text, answer:nb(y), acceptedAnswers:fxAcc(y), dedupeKey:`car|${F.expr}|${x}`, explication:expl};
+  }},
+
+  // Calcul d'antécédent
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), a=pick([2,3,4,5,6,7,-2,-3,-4]), x0=fxX(0.3,9), y0=a*x0;
+    const text=pick([
+      `Soit ${n} la fonction linéaire définie par ${n}(x) = ${nb(a)}x. Quel est l'antécédent de ${nb(y0)} par ${n} ?`,
+      `On considère la fonction ${n} : x ↦ ${nb(a)}x. Quel nombre a pour image ${nb(y0)} par ${n} ?`,
+      `La fonction ${n} est définie par ${n}(x) = ${nb(a)}x. Déterminez l'antécédent de ${nb(y0)}.`,
+    ]);
+    return {type:'input', text, answer:nb(x0), acceptedAnswers:fxAcc(x0), dedupeKey:`antl|${a}|${x0}`,
+      explication:`Chercher l'antécédent de ${nb(y0)}, c'est chercher le nombre x tel que ${n}(x) = ${nb(y0)}, c'est-à-dire ${nb(a)}x = ${nb(y0)}. On divise les deux membres par ${nb(a)} : x = ${nb(y0)} ÷ ${fxPc(a)} = <strong>${nb(x0)}</strong>. Vérification : ${n}(${nb(x0)}) = ${fxPc(a)} × ${fxPc(x0)} = ${nb(y0)}.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake('aff'), x0=fxX(0.3,8), y0=F.val(x0);
+    const text=pick([
+      `On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Quel est l'antécédent de ${nb(y0)} par ${n} ?`,
+      `Soit ${n} la fonction définie par ${n} : x ↦ ${F.expr}. Quel nombre a pour image ${nb(y0)} par ${n} ?`,
+      `La fonction ${n} est définie par ${n}(x) = ${F.expr}. Déterminez l'antécédent de ${nb(y0)}.`,
+    ]);
+    const e1=`${nb(F.a)}x = ${nb(y0)} ${F.b>0?'−':'+'} ${Math.abs(F.b)} = ${nb(y0-F.b)}`;
+    return {type:'input', text, answer:nb(x0), acceptedAnswers:fxAcc(x0), dedupeKey:`anta|${F.a}|${F.b}|${x0}`,
+      explication:`Chercher l'antécédent de ${nb(y0)}, c'est résoudre l'équation ${n}(x) = ${nb(y0)}, c'est-à-dire ${F.expr} = ${nb(y0)}. On isole le terme en x : ${e1}. Puis x = ${nb(y0-F.b)} ÷ ${fxPc(F.a)} = <strong>${nb(x0)}</strong>. Vérification : ${n}(${nb(x0)}) = ${F.det(x0)}.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    if(Math.random()<0.65){
+      const F=fxMake('aff'), x0=fxX(0.4,8), y0=F.val(x0);
+      const q=fxQcmNum(x0,[y0-F.b,y0+F.b,F.a*(y0-F.b)]);
+      return {type:'qcm', text:`Lequel de ces nombres est un antécédent de ${nb(y0)} par la fonction ${n} définie par ${n}(x) = ${F.expr} ?`, choices:q.choices, correct:q.correct,
+        explication:`Un antécédent de ${nb(y0)} est un nombre dont l'image est ${nb(y0)}. On teste le nombre ${nb(x0)} : ${n}(${nb(x0)}) = ${F.det(x0)}. Son image est bien ${nb(y0)}, donc l'antécédent est <strong>${nb(x0)}</strong>. Les autres propositions ont une image différente de ${nb(y0)}.`};
+    }
+    const F=fxMake('sq'), c=Math.random()<0.8?-rnd(1,5):rnd(1,5), v=F.val(c);
+    const oui=Math.random()<0.5;
+    const y=oui?v:(Math.random()<0.7?F.wrongs(c)[0]:v+pick([-2,-1,1,2]));
+    const choices=['Oui','Non'];
+    const expl=`On calcule l'image de ${nb(c)} : ${n}(${nb(c)}) = ${F.det(c)}. `+(oui
+      ?`Comme ${n}(${nb(c)}) = ${nb(y)}, le nombre ${nb(c)} est bien un antécédent de ${nb(y)}. Remarque : ${nb(-c)} est aussi un antécédent de ${nb(y)}, car ${nb(c)} et ${nb(-c)} ont le même carré.`
+      :`Comme ${n}(${nb(c)}) = ${nb(v)} et non ${nb(y)}, le nombre ${nb(c)} n'est pas un antécédent de ${nb(y)}.`);
+    return {type:'qcm', text:`Le nombre ${nb(c)} est-il un antécédent de ${nb(y)} par la fonction ${n} définie par ${n}(x) = ${F.expr} ?`, choices, correct:oui?0:1, explication:expl};
+  }},
+
+  // Tableaux de valeurs
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake(pick(['aff','aff','aff','sq','sqc']));
+    const xs=pick([[-2,-1,0,1,2],[-3,-2,-1,0,1],[-1,0,1,2,3],[-4,-2,0,2,4],[0,1,2,3,4],[-2,0,2,4,6]]);
+    const ys=xs.map(F.val);
+    const uniq=ys.map((y,k)=>k).filter(k=>ys.filter(v=>v===ys[k]).length===1);
+    const ante=Math.random()<0.5&&uniq.length>0;
+    const i=ante?pick(uniq):rnd(0,4);
+    const figure=fxTable(n,xs,ys);
+    if(!ante){
+      return {type:'input', text:`D'après le tableau de valeurs ci-dessous, quelle est l'image de ${nb(xs[i])} par la fonction ${n} ?`, figure, answer:nb(ys[i]), acceptedAnswers:fxAcc(ys[i]),
+        explication:`Dans le tableau, le nombre ${nb(xs[i])} se trouve dans la ligne des x. Sous ce nombre, dans la ligne de ${n}(x), on lit ${nb(ys[i])}. Donc ${n}(${nb(xs[i])}) = <strong>${nb(ys[i])}</strong>.`};
+    }
+    const text=pick([
+      `D'après le tableau de valeurs ci-dessous, quel est l'antécédent de ${nb(ys[i])} par la fonction ${n} ?`,
+      `D'après le tableau de valeurs ci-dessous, quel nombre a pour image ${nb(ys[i])} par la fonction ${n} ?`,
+    ]);
+    return {type:'input', text, figure, answer:nb(xs[i]), acceptedAnswers:fxAcc(xs[i]),
+      explication:`On cherche ${nb(ys[i])} dans la ligne de ${n}(x). Il se trouve sous le nombre ${nb(xs[i])} de la ligne des x, donc ${n}(${nb(xs[i])}) = ${nb(ys[i])}. L'antécédent de ${nb(ys[i])} est <strong>${nb(xs[i])}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake(pick(['aff','aff','sq','sqc','neg','ql','sh']));
+    const xs=shuffle([-4,-3,-2,-1,0,1,2,3,4,5]).slice(0,4).sort((p,q)=>p-q);
+    const ys=xs.map(F.val), m=rnd(0,3), x=xs[m], bs=F.base?F.base(x):0;
+    const note=bs<0?` Attention : le carré d'un nombre négatif est positif, ${fxPc(bs)}² = ${nb(bs*bs)}.`:'';
+    return {type:'input', text:`On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Quelle valeur faut-il écrire à la place du point d'interrogation dans le tableau de valeurs ci-dessous ?`,
+      figure:fxTable(n,xs,ys,m), answer:nb(ys[m]), acceptedAnswers:fxAcc(ys[m]), dedupeKey:`tab|${F.expr}|${xs.join(',')}|${m}`,
+      explication:`La case manquante correspond à x = ${nb(x)}. On calcule ${n}(${nb(x)}) = ${F.det(x)}.${note} Il faut donc écrire <strong>${nb(ys[m])}</strong>.`};
+  }},
+
+  // Lecture graphique
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const S=fxScene(['line','line','par','free','mono'],fxPointImage)||fxScene(['line'],fxPointImage);
+    const {C,P}=S, obj=C.isLine?'la droite':'la courbe';
+    const text=pick([
+      `On a représenté ci-dessous la fonction ${n}. Quelle est l'image de ${nb(P.x)} par ${n} ?`,
+      `Sur le graphique ci-dessous, lisez ${n}(${nb(P.x)}).`,
+      `Voici la représentation graphique de la fonction ${n}. Déterminez graphiquement l'image de ${nb(P.x)}.`,
+    ]);
+    return {type:'input', text, figure:svgFonction({name:n,ymin:S.ymin,ymax:S.ymax,curve:C}), answer:nb(P.y), acceptedAnswers:fxAcc(P.y), dedupeKey:`img|${C.key}|${P.x}`,
+      explication:`Pour lire l'image de ${nb(P.x)}, on repère ${nb(P.x)} sur l'axe des abscisses (axe horizontal), on se déplace verticalement jusqu'à ${obj}, puis on lit l'ordonnée du point obtenu sur l'axe des ordonnées (axe vertical). On trouve ${n}(${nb(P.x)}) = <strong>${nb(P.y)}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const S=fxScene(['line','line','mono'],fxPointAntecedent)||fxScene(['line'],fxPointAntecedent);
+    const {C,P}=S, obj=C.isLine?'la droite':'la courbe';
+    const text=pick([
+      `On a représenté ci-dessous la fonction ${n}. Quel est l'antécédent de ${nb(P.y)} par ${n} ?`,
+      `Voici la représentation graphique de la fonction ${n}. Quel nombre a pour image ${nb(P.y)} ?`,
+      `Sur le graphique ci-dessous, résolvez graphiquement ${n}(x) = ${nb(P.y)}.`,
+    ]);
+    return {type:'input', text, figure:svgFonction({name:n,ymin:S.ymin,ymax:S.ymax,curve:C}), answer:nb(P.x), acceptedAnswers:fxAcc(P.x), dedupeKey:`ant|${C.key}|${P.y}`,
+      explication:`Pour lire l'antécédent de ${nb(P.y)}, on repère ${nb(P.y)} sur l'axe des ordonnées (axe vertical), on se déplace horizontalement jusqu'à ${obj}, puis on lit l'abscisse du point obtenu sur l'axe des abscisses (axe horizontal). L'antécédent de ${nb(P.y)} est <strong>${nb(P.x)}</strong>, c'est-à-dire ${n}(${nb(P.x)}) = ${nb(P.y)}.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    const S=fxScene(['line','par','free','mono'],C=>{ const P=fxPointImage(C); return P&&P.x!==0&&P.y!==0&&P.x!==P.y?P:null; })||fxScene(['line'],C=>{ const P=fxPointImage(C); return P&&P.x!==0&&P.y!==0&&P.x!==P.y?P:null; });
+    const {C,P}=S, A=nb(P.x), B=nb(P.y), ok=`${n}(${A}) = ${B}`;
+    const choices=shuffle([ok,`${n}(${B}) = ${A}`,`${n}(${A} ; ${B}) = 0`,`${n} = ${fxPc(P.x)} × ${fxPc(P.y)}`]);
+    return {type:'qcm', text:`Le point A appartient à la représentation graphique de la fonction ${n}. Quelle égalité traduit cette information ?`,
+      figure:svgFonction({name:n,ymin:S.ymin,ymax:S.ymax,curve:C,point:{x:P.x,y:P.y,label:'A'}}), choices, correct:choices.indexOf(ok), dedupeKey:`pt|${C.key}|${P.x}`,
+      explication:`On lit les coordonnées du point A : son abscisse est ${A} et son ordonnée est ${B}, donc A(${A} ; ${B}). L'abscisse est le nombre de départ et l'ordonnée est son image : on écrit <strong>${ok}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS);
+    for(let t=0;t<300;t++){
+      const s=pick([1,-1]), h=rnd(-2,2), v=rnd(-3,3), c=rnd(0,2);
+      const d=pick([1,2]);
+      const k=c===1?v:c===2?v+s*d*d:v-s*rnd(1,3);
+      const w=fxWindow([v,k]); if(!w) continue;
+      const C={type:'par',isLine:false,s,h,v,f:x=>s*(x-h)*(x-h)+v,d0:-5,d1:5};
+      const K=nb(k);
+      const expl=c===0
+        ?`Les antécédents de ${K} sont les abscisses des points de la courbe dont l'ordonnée est ${K}. La droite horizontale passant par ${K} sur l'axe des ordonnées ne coupe pas la courbe : le nombre ${K} n'a <strong>aucun</strong> antécédent.`
+        :c===1
+        ?`Les antécédents de ${K} sont les abscisses des points de la courbe dont l'ordonnée est ${K}. La droite horizontale passant par ${K} sur l'axe des ordonnées touche la courbe en un seul point, son sommet : le nombre ${K} a <strong>un seul</strong> antécédent, ${nb(h)}.`
+        :`Les antécédents de ${K} sont les abscisses des points de la courbe dont l'ordonnée est ${K}. La droite horizontale passant par ${K} sur l'axe des ordonnées coupe la courbe en deux points, d'abscisses ${nb(h-d)} et ${nb(h+d)} : le nombre ${K} a <strong>deux</strong> antécédents.`;
+      return {type:'qcm', text:`Combien le nombre ${K} a-t-il d'antécédents par la fonction ${n} représentée ci-dessous ?`,
+        figure:svgFonction({name:n,ymin:w[0],ymax:w[1],curve:C}), choices:['Aucun','Un seul','Deux','Trois'], correct:c, dedupeKey:`nba|${s}|${h}|${v}|${k}`, explication:expl};
+    }
+  }},
+
+  // Fonctions linéaires et affines
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), a=pick([2,3,4,5,6,7,-2,-3]), x1=pick([2,3,4,5,6,-2,-3]), y1=a*x1;
+    let x2; do{ x2=pick([2,3,4,5,6,7,8,-2,-3,-4]); }while(x2===x1);
+    const y2=a*x2, forme=rnd(0,3);
+    const base=`Comme ${n}(${nb(x1)}) = ${nb(y1)}, on a a × ${fxPc(x1)} = ${nb(y1)}, donc a = ${nb(y1)} ÷ ${fxPc(x1)} = ${nb(a)}. La fonction est ${n}(x) = ${nb(a)}x.`;
+    const intro=`Une fonction linéaire s'écrit ${n}(x) = ax.`;
+    if(forme<=1){
+      const text=forme===0
+        ?`La fonction linéaire ${n} est telle que ${n}(${nb(x1)}) = ${nb(y1)}. Calculez ${n}(${nb(x2)}).`
+        :`L'image de ${nb(x1)} par la fonction linéaire ${n} est ${nb(y1)}. Quelle est l'image de ${nb(x2)} par ${n} ?`;
+      return {type:'input', text, answer:nb(y2), acceptedAnswers:fxAcc(y2), dedupeKey:`li|${a}|${x1}|${x2}`,
+        explication:`${intro} ${base} Donc ${n}(${nb(x2)}) = ${fxPc(a)} × ${fxPc(x2)} = <strong>${nb(y2)}</strong>.`};
+    }
+    if(forme===2){
+      return {type:'input', text:`La fonction linéaire ${n} est telle que ${n}(${nb(x1)}) = ${nb(y1)}. Quel est l'antécédent de ${nb(y2)} par ${n} ?`, answer:nb(x2), acceptedAnswers:fxAcc(x2), dedupeKey:`la|${a}|${x1}|${x2}`,
+        explication:`${intro} ${base} L'antécédent de ${nb(y2)} est le nombre x tel que ${nb(a)}x = ${nb(y2)}, soit x = ${nb(y2)} ÷ ${fxPc(a)} = <strong>${nb(x2)}</strong>.`};
+    }
+    return {type:'input', text:`La fonction linéaire ${n} est telle que ${n}(${nb(x1)}) = ${nb(y1)}. Quel est le coefficient de ${n} ?`, answer:nb(a), acceptedAnswers:fxAcc(a), dedupeKey:`lc|${a}|${x1}`,
+      explication:`${intro} Comme ${n}(${nb(x1)}) = ${nb(y1)}, on a a × ${fxPc(x1)} = ${nb(y1)}, donc a = ${nb(y1)} ÷ ${fxPc(x1)} = <strong>${nb(a)}</strong>.`};
+  }},
+
+  { theme:"Fonctions", generate:()=>{
+    const n=pick(FX_NOMS), F=fxMake(pick(['aff','aff','aff','sq','sh'])), y=F.val(0);
+    const text=pick([
+      `On considère la fonction ${n} définie par ${n}(x) = ${F.expr}. Calculez ${n}(0).`,
+      `Quelle est l'image de 0 par la fonction ${n} définie par ${n}(x) = ${F.expr} ?`,
+    ]);
+    const plus=F.kind==='aff'?` L'image de 0 est le terme constant de l'expression : ici ${nb(F.b)}.`:'';
+    return {type:'input', text, answer:nb(y), acceptedAnswers:fxAcc(y), dedupeKey:`zero|${F.expr}`,
+      explication:`On remplace x par 0 : ${n}(0) = ${F.det(0)}.${plus} L'image de 0 par ${n} est <strong>${nb(y)}</strong>.`};
   }},
 
   // ── ALGORITHMIQUE ──────────────────────────────────
@@ -1927,7 +2448,7 @@ const GENERATORS = [
 // ═══════════════════════════════════════════════════════════
 const THEMES = ['Tous les thèmes','Nombres & calculs','Fractions','Algèbre & équations',
   'Géométrie plane','Pythagore - Théorème','Pythagore - Réciproque','Thalès - Théorème','Thalès - Réciproque','Trigonométrie','Aires & volumes',
-  'Conversions d\'unités','Statistiques & probabilités','Proportionnalité & fonctions',
+  'Conversions d\'unités','Statistiques & probabilités','Proportionnalité & pourcentages','Fonctions',
   'Algorithmique','Repère & coordonnées'];
 
 // ═══════════════════════════════════════════════════════════
