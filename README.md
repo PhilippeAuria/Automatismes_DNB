@@ -1,4 +1,4 @@
-# Automatismes_DNB
+# AutoDNB3ème
 
 Application d'entraînement pour les élèves de 3ème, dédiée à la partie « Automatismes » de l'épreuve de mathématiques du Brevet des collèges (DNB).
 
