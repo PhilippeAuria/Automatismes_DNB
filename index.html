@@ -675,7 +675,7 @@ function svgThalesSablier(vals) {
 // SVG Scratch
 function svgScratch(blocs) {
   // blocs: [{type:'event'|'repeat'|'move'|'turn', val}]
-  let y=0; let svg='';
+  let y=0; let svg=''; const departs=[];
   const W=260, xi=44, xi2=64, enc=8, ex=72, ex2=92;
   blocs.forEach((b,i)=>{
     if(b.type==='event'){
@@ -693,10 +693,11 @@ function svgScratch(blocs) {
       svg+=`<rect x="${xi+82}" y="${y+9}" width="24" height="16" rx="8" fill="white" stroke="#CF6E17" stroke-width="1"/>`;
       svg+=`<text x="${xi+94}" y="${y+21}" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#7A4400" font-weight="700">${b.val}</text>`;
       svg+=`<text x="${xi+112}" y="${y+22}" font-size="11" font-family="sans-serif" fill="white" font-weight="600">fois</text>`;
-      y+=34; b._startY=y;
+      y+=34; departs.push(y);
     } else if(b.type==='repeat_end'){
       // paroi gauche
-      svg+=`<rect x="${xi}" y="${b._startY}" width="20" height="${y-b._startY}" fill="#E6821E" stroke="#CF6E17" stroke-width="1"/>`;
+      const yDepart=departs.length?departs.pop():y;
+      svg+=`<rect x="${xi}" y="${yDepart}" width="20" height="${y-yDepart}" fill="#E6821E" stroke="#CF6E17" stroke-width="1"/>`;
       svg+=`<path d="M${xi},${y} L${xi2},${y} L${W},${y} L${W},${y+24} L${ex2},${y+24} L${ex2},${y+24+enc} Q${(ex+ex2)/2},${y+24+enc+4} ${ex},${y+24+enc} L${ex},${y+24} L${xi},${y+24} Z" fill="#E6821E" stroke="#CF6E17" stroke-width="1"/>`;
       y+=24;
     } else if(b.type==='move'){
@@ -2583,13 +2584,19 @@ function selectChoice(i,btn){
   showFeedback(correct,q); updateNavButtons();
 }
 
+// Compare la réponse tapée à la réponse attendue (virgule ou point, signe moins du clavier ou typographique)
+function isCorrect(q, raw){
+  const clean = s => String(s).toLowerCase().replace(/\s/g,'').replace(/,/g,'.').replace(/−/g,'-');
+  const num = v => /^-?\d+(\.\d+)?$/.test(v) ? parseFloat(v) : NaN;
+  const accepted = (q.acceptedAnswers || [q.answer]).map(clean);
+  const norm = clean(raw);
+  return accepted.includes(norm) || (!Number.isNaN(num(norm)) && num(norm) === num(clean(q.answer)));
+}
+
 function validateInput(){
   const q=sessionQuestions[currentIdx]; const input=document.getElementById('q-input');
   const raw=input.value.trim(); if(!raw)return;
-  const accepted=q.acceptedAnswers?q.acceptedAnswers.map(a=>a.toLowerCase().replace(/\s/g,'')):
-    [q.answer.toLowerCase().replace(/[,]/g,'.').replace(/\s/g,'')];
-  const norm=raw.toLowerCase().replace(',','.').replace(/\s/g,'');
-  const correct=accepted.includes(norm)||(parseFloat(norm)===parseFloat(q.answer));
+  const correct=isCorrect(q,raw);
   answers[currentIdx]={answered:true,correct,skipped:false,userAnswer:raw};
   sessionAnswered=true; input.disabled=true;
   document.getElementById('btn-validate').style.display='none';
