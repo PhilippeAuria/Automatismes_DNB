@@ -147,6 +147,10 @@ header{width:100%;background:var(--surface);border-bottom:1px solid var(--border
 .correction-item.ko{border-left-color:var(--red);}
 .ci-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px;}
 .ci-q{font-size:.88rem;color:var(--text);line-height:1.5;font-weight:400;flex:1;}
+.correction-item .q-figure{margin:8px 0 10px;}
+.correction-item .q-figure svg{max-width:100%;max-height:230px;width:auto;height:auto;}
+.correction-item .q-figure table{font-size:.9rem;}
+.correction-item .q-figure table td,.correction-item .q-figure table th{padding:4px 12px;}
 .ci-status{font-family:'Syne',sans-serif;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;}
 .ci-status.ok{background:rgba(61,214,140,.15);color:var(--green);}
 .ci-status.ko{background:rgba(255,92,92,.12);color:var(--red);}
@@ -2679,6 +2683,7 @@ function finishSession(){
     const correctAnswer=q.type==='qcm'?q.choices[q.correct]:q.answer;
     const userDisplay=a.skipped?'-':q.type==='qcm'&&a.userAnswer!==''?q.choices[parseInt(a.userAnswer)]||a.userAnswer:a.userAnswer||'-';
     div.innerHTML=`<div class="ci-top"><div class="ci-q">${q.text}</div><div class="ci-status ${statusClass}">${statusText}</div></div>
+      ${q.figure?`<div class="q-figure">${q.figure}</div>`:''}
       <div class="ci-answer">Votre réponse : <strong>${userDisplay}</strong></div>
       ${!a.correct?`<div class="ci-answer">Bonne réponse : <strong>${correctAnswer}</strong></div>`:''}
       <div class="ci-expl">${q.explication||''}</div>`;
