@@ -2,6 +2,8 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+  <!-- Sécurité : seul le script de cette page s'exécute (empreinte SHA-256), aucune connexion réseau. Détails : SECURITY.md. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hgTqoR1Ev1HX0f0Ossb7GhSq9G/zGdJjTZNEvuZPfzg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'none'; manifest-src 'self'; worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -223,10 +225,10 @@ body.presenting .ci-expl{font-size:1.15rem;}
 <header>
   <div class="logo">Auto<span>DNB</span>3ème</div>
   <div style="display:flex;align-items:center;gap:16px;">
-    <button id="fs-btn" onclick="toggleFullscreen()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
+    <button id="fs-btn" data-onclick="toggleFullscreen" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
       <span id="fs-icon">⛶</span><span id="fs-label">Plein écran</span>
     </button>
-    <button id="theme-toggle" onclick="toggleTheme()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
+    <button id="theme-toggle" data-onclick="toggleTheme" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;">
       <span id="theme-icon">☀️</span><span id="theme-label">Fond clair</span>
     </button>
     <div class="header-info">Révision des automatismes · 3ème<br>Collège Fernand Donatien · Fort-de-France</div>
@@ -240,12 +242,12 @@ body.presenting .ci-expl{font-size:1.15rem;}
   <div class="home-sub">Épreuve de mathématiques du DNB Niveau 3ème · Cycle 4</div>
   <div class="section-label">Choisis ton mode</div>
   <div class="mode-cards">
-    <div class="mode-card selected" id="card-train" onclick="selectMode('training')">
+    <div class="mode-card selected" id="card-train" data-onclick="selectMode__training">
       <div class="mode-icon">📚</div>
       <div class="mode-title">Entraînement libre</div>
       <div class="mode-desc">Feedback immédiat après chaque réponse. Choix du thème, sans limite de temps.</div>
     </div>
-    <div class="mode-card exam-mode" id="card-exam" onclick="selectMode('exam')">
+    <div class="mode-card exam-mode" id="card-exam" data-onclick="selectMode__exam">
       <div class="mode-badge">DNB</div>
       <div class="mode-icon">⏱️</div>
       <div class="mode-title">Épreuve réelle</div>
@@ -257,7 +259,7 @@ body.presenting .ci-expl{font-size:1.15rem;}
     <div class="theme-grid" id="theme-grid"></div>
   </div>
   <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
-    <button class="btn btn-primary" id="start-btn" onclick="startSession()">Commencer</button>
+    <button class="btn btn-primary" id="start-btn" data-onclick="startSession">Commencer</button>
   </div>
   <div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--border);font-size:.75rem;color:var(--muted);text-align:center;line-height:1.8;">
     <span class="pied-forge"><a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB" target="_blank" rel="noopener noreferrer">AutoDNB3ème<span class="visually-hidden"> (nouvelle fenêtre)</span></a> par <a href="mailto:philippe.auria@ac-martinique.fr">Philippe Auria</a> · sous licence <a href="https://www.gnu.org/licenses/gpl-3.0.fr.html" target="_blank" rel="noopener noreferrer">GNU GPL v3<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · un commun de la <a href="https://forge.apps.education.fr" target="_blank" rel="noopener noreferrer">Forge des Communs Numériques Éducatifs<span class="visually-hidden"> (nouvelle fenêtre)</span></a><br>Collège Fernand Donatien · Fort-de-France · <a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB/-/tree/main" target="_blank" rel="noopener noreferrer">Code source<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB/-/issues" target="_blank" rel="noopener noreferrer">Suggérer et signaler<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB/mentions-legales.html" target="_blank" rel="noopener noreferrer">Mentions légales<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB/accessibilite.html" target="_blank" rel="noopener noreferrer">Accessibilité : non conforme<span class="visually-hidden"> (nouvelle fenêtre)</span></a></span>
@@ -282,7 +284,7 @@ body.presenting .ci-expl{font-size:1.15rem;}
     <div class="choices" id="choices-container"></div>
     <div class="input-area" id="input-area" style="display:none">
       <input type="text" class="q-input" id="q-input" placeholder="Ta réponse…" autocomplete="off">
-      <button class="btn-validate" id="btn-validate" onclick="validateInput()">Valider</button>
+      <button class="btn-validate" id="btn-validate" data-onclick="validateInput">Valider</button>
     </div>
     <div class="feedback-box" id="feedback-box">
       <span class="feedback-icon"></span>
@@ -291,11 +293,11 @@ body.presenting .ci-expl{font-size:1.15rem;}
     </div>
   </div>
   <div class="q-nav">
-    <button class="btn-ghost" onclick="goHome()">← Accueil</button>
+    <button class="btn-ghost" data-onclick="goHome">← Accueil</button>
     <div style="display:flex;gap:10px;">
-      <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()" style="display:none">Suivant</button>
-      <button class="btn btn-primary" id="btn-finish" onclick="finishSession()" style="display:none">Voir les résultats</button>
-      <button class="btn btn-secondary" id="btn-skip" onclick="skipQuestion()">Passer</button>
+      <button class="btn btn-primary" id="btn-next" data-onclick="nextQuestion" style="display:none">Suivant</button>
+      <button class="btn btn-primary" id="btn-finish" data-onclick="finishSession" style="display:none">Voir les résultats</button>
+      <button class="btn btn-secondary" id="btn-skip" data-onclick="skipQuestion">Passer</button>
     </div>
   </div>
 </div>
@@ -321,8 +323,8 @@ body.presenting .ci-expl{font-size:1.15rem;}
   <div class="correction-title">Correction détaillée</div>
   <div id="correction-list"></div>
   <div class="results-actions">
-    <button class="btn btn-primary" onclick="restartSame()">Recommencer</button>
-    <button class="btn btn-secondary" onclick="goHome()">Accueil</button>
+    <button class="btn btn-primary" data-onclick="restartSame">Recommencer</button>
+    <button class="btn btn-secondary" data-onclick="goHome">Accueil</button>
   </div>
   <div style="margin-top:36px;padding-top:16px;border-top:1px solid var(--border);font-size:.72rem;color:var(--muted);text-align:center;">
     <span class="pied-forge"><a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB" target="_blank" rel="noopener noreferrer">AutoDNB3ème<span class="visually-hidden"> (nouvelle fenêtre)</span></a> par <a href="mailto:philippe.auria@ac-martinique.fr">Philippe Auria</a> · sous licence <a href="https://www.gnu.org/licenses/gpl-3.0.fr.html" target="_blank" rel="noopener noreferrer">GNU GPL v3<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · un commun de la <a href="https://forge.apps.education.fr" target="_blank" rel="noopener noreferrer">Forge des Communs Numériques Éducatifs<span class="visually-hidden"> (nouvelle fenêtre)</span></a><br>Collège Fernand Donatien · Fort-de-France · <a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB/-/tree/main" target="_blank" rel="noopener noreferrer">Code source<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB/-/issues" target="_blank" rel="noopener noreferrer">Suggérer et signaler<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB/mentions-legales.html" target="_blank" rel="noopener noreferrer">Mentions légales<span class="visually-hidden"> (nouvelle fenêtre)</span></a> · <a href="https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB/accessibilite.html" target="_blank" rel="noopener noreferrer">Accessibilité : non conforme<span class="visually-hidden"> (nouvelle fenêtre)</span></a></span>
@@ -331,6 +333,33 @@ body.presenting .ci-expl{font-size:1.15rem;}
 
 </div><!-- /container -->
 <script>
+// ═══════════════════════════════════════════════════════════
+// ACTIONS DE L'INTERFACE
+// Remplacent les attributs onclick / onchange en ligne (interdits par la politique de sécurité, voir SECURITY.md).
+// Un bouton porte data-onclick="nom" ; chaque action exécute le même code qu'avant.
+// ═══════════════════════════════════════════════════════════
+const ACTIONS = {
+  toggleFullscreen: function(event){ toggleFullscreen() },
+  toggleTheme: function(event){ toggleTheme() },
+  selectMode__training: function(event){ selectMode('training') },
+  selectMode__exam: function(event){ selectMode('exam') },
+  startSession: function(event){ startSession() },
+  validateInput: function(event){ validateInput() },
+  goHome: function(event){ goHome() },
+  nextQuestion: function(event){ nextQuestion() },
+  finishSession: function(event){ finishSession() },
+  skipQuestion: function(event){ skipQuestion() },
+  restartSame: function(event){ restartSame() },
+};
+['click'].forEach(type=>{
+  document.addEventListener(type, ev=>{
+    for(let el=ev.target; el && el.nodeType===1; el=el.parentElement){
+      const key=el.getAttribute('data-on'+type);
+      if(key && ACTIONS[key]){ ACTIONS[key].call(el, ev); if(ev.cancelBubble) break; }
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════
 // UTILITAIRES
 // ═══════════════════════════════════════════════════════════

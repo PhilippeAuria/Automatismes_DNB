@@ -4,6 +4,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les
 
 ## 2026-11-05
 
+### Sécurité
+- Politique de sécurité du contenu (CSP) stricte : seul le script de la page s'exécute, aucune connexion réseau.
+- Les attributs `onclick` et `onchange` en ligne sont remplacés par un écouteur d'événements unique. Le comportement de l'application est inchangé.
+
+## 2026-11-05
+
 ### Ajouté
 - Pied de page avec auteur, licence GNU GPL v3, appartenance à la Forge des Communs Numériques Éducatifs, code source et tickets.
 - Pages `mentions-legales.html` et `accessibilite.html` (déclaration « non conforme » tant qu'aucun audit n'est fait).
