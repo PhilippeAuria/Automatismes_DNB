@@ -1,30 +1,81 @@
-# AutoDNB3ème
+# AutoDNB3ème · Réviser les automatismes du DNB
 
-Application d'entraînement pour les élèves de 3ème, dédiée à la partie « Automatismes » de l'épreuve de mathématiques du Brevet des collèges (DNB).
+AutoDNB3ème : s'entraîner aux automatismes de l'épreuve de mathématiques du DNB, en libre ou en épreuve chronométrée de 20 minutes, avec correction détaillée. Sans compte, rien ne quitte l'appareil.
 
-## Description
+🔗 **Utiliser en ligne :** https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB/
+📄 Licence [GNU GPL v3](LICENSE) · 📜 [Nouveautés](CHANGELOG.md) · 🛡️ [Sécurité](SECURITY.md) · ♿ [Accessibilité](accessibilite.html)
 
-Application web autonome (un seul fichier HTML) permettant aux élèves de s'entraîner en autonomie sur les automatismes attendus à l'examen : calcul mental, algèbre, géométrie, proportionnalité, statistiques, etc. Les questions sont générées aléatoirement à chaque session, avec correction détaillée et figures géométriques quand nécessaire.
+## Pour quoi faire ?
+
+S'entraîner aux automatismes de l'épreuve de mathématiques du DNB, soit librement par thème avec correction immédiate, soit en épreuve réelle de 20 minutes notée sur 6 points.
+
+## Pour qui ?
+
+Les élèves de 3ème, en autonomie ou en classe.
+
+## Comment l'utiliser
+
+1. Ouvrez la page en ligne (rien à installer, pas de compte).
+2. Choisissez « Entraînement libre » (un thème, correction après chaque réponse) ou « Épreuve réelle » (20 minutes chrono, correction à la fin).
+3. Répondez aux questions : réponse libre ou QCM.
+4. Consultez la correction détaillée et les figures à la fin de la série.
+
+Pour l'utiliser hors ligne, téléchargez le dépôt et ouvrez `index.html` dans un navigateur : aucune dépendance, aucune connexion nécessaire.
 
 ## Fonctionnalités
 
-- Génération procédurale de questions (valeurs numériques renouvelées à chaque tirage, pas de banque figée).
-- 15 thèmes du programme de 3ème, y compris Pythagore (théorème/réciproque) et Thalès (théorème/réciproque) traités séparément.
-- Deux types de questions : réponse libre et QCM.
-- Correction immédiate avec explication pour chaque question.
-- Figures géométriques générées en SVG.
-- Interface simple, utilisable sur ordinateur, tablette ou smartphone.
+- 15 thèmes du programme de 3ème, avec Pythagore et Thalès traités séparément.
+- Entraînement libre avec correction immédiate, ou épreuve de 20 minutes notée sur 6.
+- Questions de réponse libre ou QCM, générées au hasard à chaque série.
+- Figures, tableaux et graphiques générés en SVG, rappelés dans la correction finale.
 
-## Utilisation
+## Données et vie privée
 
-Ouvrir simplement `index.html` dans un navigateur, aucune dépendance ni connexion internet requise après téléchargement.
+Aucun compte, aucun cookie, aucune mesure d'audience, aucun serveur. Le navigateur garde uniquement le thème clair ou sombre (clé `autodnb-theme`) sur l'appareil. Rien n'est envoyé sur le réseau. Aucune donnée personnelle d'élève n'est traitée. Pour tout effacer, supprimer les données du site dans le navigateur.
 
-Version en ligne : https://auriaphilippe.forge.apps.education.fr/Automatismes_DNB
+## Accessibilité
+
+**Accessibilité : non conforme** (aucun audit réalisé). Les contenus connus comme non accessibles sont listés dans la [déclaration d'accessibilité](accessibilite.html), avec les pistes d'amélioration.
+
+## Sécurité
+
+Aucune bibliothèque ni police chargée depuis un site tiers, aucune requête réseau, pas d'`eval`. Le détail, les limites de GitLab Pages et la façon de signaler une faille sont dans [SECURITY.md](SECURITY.md).
+
+## Conception et IA
+
+Le code a été écrit avec l'aide de Claude (Anthropic), puis relu, testé et maintenu par Philippe Auria. L'application n'appelle aucune intelligence artificielle et n'envoie aucune donnée. Les questions et corrections sont produites par des règles écrites à la main, mais doivent rester relues par l'enseignant.
+
+## Lancer en local / publier
+
+- En local : ouvrir `index.html` dans un navigateur.
+- Publication : GitLab Pages, via `.gitlab-ci.yml`, à chaque envoi sur la branche `main`. Aucune étape de construction.
+
+## Architecture
+
+```text
+index.html             L'application (un seul fichier)
+mentions-legales.html  Mentions légales
+accessibilite.html     Déclaration d'accessibilité
+assets/favicon.svg     Icône
+assets/fonts/          Polices Syne et DM Sans (.woff2) et leur licence OFL
+LICENSE                Licence GNU GPL v3
+SECURITY.md            Sécurité
+CHANGELOG.md           Historique des versions
+.gitlab-ci.yml         Publication GitLab Pages
+```
+
+## Contribuer
+
+- Signaler une erreur ou proposer une idée : [ouvrir un ticket](https://forge.apps.education.fr/auriaphilippe/Automatismes_DNB/-/issues).
+- Proposer une modification : fourche du dépôt, puis demande de fusion.
+- Règles : le français est la langue du projet (interface, commentaires, messages de commit) ; aucune dépendance externe ; tester l'application avant de proposer une modification.
+
+## Crédits
+
+- Les générateurs de questions sont écrits par l'auteur ; ils s'inspirent des programmes officiels, des ressources Éduscol « Les automatismes au collège » et des sujets du DNB publiés par le ministère.
+- Polices **Syne** (© The Syne Project Authors) et **DM Sans** (© The DM Sans Project Authors), licence SIL Open Font License 1.1, voir `assets/fonts/`.
+- Conçu par Philippe Auria, Collège Fernand Donatien, Fort-de-France.
 
 ## Licence
 
-Ce projet est distribué sous licence **GNU GPL v3**. Voir le fichier [LICENSE](LICENSE).
-
-## Auteur
-
-Philippe Auria, Collège Fernand Donatien, Fort-de-France.
+Logiciel libre sous licence [GNU GPL v3](LICENSE).
