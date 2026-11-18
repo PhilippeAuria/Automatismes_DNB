@@ -24,7 +24,7 @@ Pour l'utiliser hors ligne, téléchargez le dépôt et ouvrez `index.html` dans
 
 ## Fonctionnalités
 
-- 15 thèmes du programme de 3ème, avec Pythagore et Thalès traités séparément.
+- 16 thèmes du programme de 3ème, avec Pythagore et Thalès traités séparément.
 - Entraînement libre avec correction immédiate, ou épreuve de 20 minutes notée sur 6.
 - Questions de réponse libre ou QCM, générées au hasard à chaque série.
 - Figures, tableaux et graphiques générés en SVG, rappelés dans la correction finale.
